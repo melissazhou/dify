@@ -33,10 +33,12 @@ def init_app(app: DifyApp) -> None:
     )
 
     # Ensure route decorators are evaluated.
+    import controllers.console.bike_brand_solution_kit as bike_brand_solution_kit_module
     import controllers.console.init_validate as init_validate_module
     import controllers.console.ping as ping_module
     from controllers.console import remote_files, setup
 
+    _ = bike_brand_solution_kit_module
     _ = init_validate_module
     _ = ping_module
     _ = remote_files

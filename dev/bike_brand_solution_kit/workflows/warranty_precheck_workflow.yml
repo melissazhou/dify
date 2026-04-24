@@ -1,0 +1,754 @@
+app:
+  description: P0 warranty precheck workflow with rules service and human escalation.
+  icon: warranty
+  icon_background: '#FEF3C7'
+  mode: workflow
+  name: warranty_precheck_workflow
+  use_icon_as_answer_icon: false
+dependencies: []
+kind: app
+version: 0.3.1
+workflow:
+  conversation_variables: []
+  environment_variables:
+  - name: BIKE_BRAND_WARRANTY_API_BASE_URL
+    value: https://warranty-api.example.com
+  - name: BIKE_BRAND_TICKET_API_BASE_URL
+    value: https://ticket-api.example.com
+  features:
+    file_upload:
+      allowed_file_extensions:
+      - .JPG
+      - .JPEG
+      - .PNG
+      - .WEBP
+      - .PDF
+      allowed_file_types:
+      - image
+      - document
+      allowed_file_upload_methods:
+      - local_file
+      - remote_url
+      enabled: true
+      fileUploadConfig:
+        batch_count_limit: 8
+        file_size_limit: 15
+        image_file_size_limit: 10
+        workflow_file_upload_limit: 8
+      image:
+        enabled: true
+        number_limits: 6
+        transfer_methods:
+        - local_file
+        - remote_url
+      number_limits: 8
+    opening_statement: ''
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: true
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: if-else
+      id: start-to-safety-gate
+      source: start
+      sourceHandle: source
+      target: safety_gate
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: if-else
+        targetType: human-input
+      id: safety-gate-to-human
+      source: safety_gate
+      sourceHandle: safety_escalation
+      target: human_review
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: if-else
+        targetType: if-else
+      id: safety-gate-to-required-fields-gate
+      source: safety_gate
+      sourceHandle: false
+      target: required_fields_gate
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: if-else
+        targetType: end
+      id: required-fields-to-missing-end
+      source: required_fields_gate
+      sourceHandle: missing_required_fields
+      target: missing_fields_end
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: if-else
+        targetType: knowledge-retrieval
+      id: required-fields-to-policy-retrieval
+      source: required_fields_gate
+      sourceHandle: false
+      target: warranty_policy_retrieval
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: knowledge-retrieval
+        targetType: http-request
+      id: policy-retrieval-to-rule-service
+      source: warranty_policy_retrieval
+      sourceHandle: source
+      target: warranty_rules_service
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: http-request
+        targetType: if-else
+      id: rule-service-to-decision-gate
+      source: warranty_rules_service
+      sourceHandle: source
+      target: decision_gate
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: if-else
+        targetType: human-input
+      id: decision-gate-to-human-review
+      source: decision_gate
+      sourceHandle: requires_human_review
+      target: human_review
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: if-else
+        targetType: http-request
+      id: decision-gate-to-ticket-escalation
+      source: decision_gate
+      sourceHandle: create_ticket
+      target: ticket_escalation
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: if-else
+        targetType: end
+      id: decision-gate-to-precheck-end
+      source: decision_gate
+      sourceHandle: false
+      target: precheck_end
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: human-input
+        targetType: http-request
+      id: human-review-to-ticket-escalation
+      source: human_review
+      sourceHandle: source
+      target: ticket_escalation
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: http-request
+        targetType: end
+      id: ticket-escalation-to-end
+      source: ticket_escalation
+      sourceHandle: source
+      target: escalated_end
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        desc: Warranty precheck intake. File URLs should be generated by the BFF or Dify file upload.
+        selected: false
+        title: Start
+        type: start
+        variables:
+        - label: model
+          max_length: 120
+          options: []
+          required: true
+          type: text-input
+          variable: model
+        - label: model_year
+          max_length: 4
+          options: []
+          required: true
+          type: text-input
+          variable: model_year
+        - label: serial_no
+          max_length: 80
+          options: []
+          required: true
+          type: text-input
+          variable: serial_no
+        - label: purchase_proof_url
+          max_length: 500
+          options: []
+          required: true
+          type: text-input
+          variable: purchase_proof_url
+        - label: component
+          max_length: 120
+          options: []
+          required: true
+          type: text-input
+          variable: component
+        - label: photo_urls
+          max_length: 2000
+          options: []
+          required: true
+          type: paragraph
+          variable: photo_urls
+        - label: region
+          max_length: 80
+          options: []
+          required: true
+          type: text-input
+          variable: region
+        - label: usage_description
+          max_length: 2000
+          options: []
+          required: true
+          type: paragraph
+          variable: usage_description
+        - label: customer_id
+          max_length: 120
+          options: []
+          required: false
+          type: text-input
+          variable: customer_id
+      height: 240
+      id: start
+      position:
+        x: 30
+        y: 260
+      positionAbsolute:
+        x: 30
+        y: 260
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        cases:
+        - case_id: safety_escalation
+          conditions:
+          - comparison_operator: contains
+            id: smoke-risk
+            value: smoke
+            varType: string
+            variable_selector:
+            - start
+            - usage_description
+          - comparison_operator: contains
+            id: fire-risk
+            value: fire
+            varType: string
+            variable_selector:
+            - start
+            - usage_description
+          - comparison_operator: contains
+            id: swelling-risk
+            value: swelling
+            varType: string
+            variable_selector:
+            - start
+            - usage_description
+          - comparison_operator: contains
+            id: brake-risk
+            value: brake failure
+            varType: string
+            variable_selector:
+            - start
+            - usage_description
+          - comparison_operator: contains
+            id: frame-crack-risk
+            value: frame crack
+            varType: string
+            variable_selector:
+            - start
+            - usage_description
+          id: safety_escalation
+          logical_operator: or
+        desc: Any safety signal bypasses automated eligibility and goes to human review.
+        selected: false
+        title: Safety Gate
+        type: if-else
+      height: 170
+      id: safety_gate
+      position:
+        x: 334
+        y: 260
+      positionAbsolute:
+        x: 334
+        y: 260
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        cases:
+        - case_id: missing_required_fields
+          conditions:
+          - comparison_operator: empty
+            id: missing-model
+            value: ''
+            varType: string
+            variable_selector:
+            - start
+            - model
+          - comparison_operator: empty
+            id: missing-model-year
+            value: ''
+            varType: string
+            variable_selector:
+            - start
+            - model_year
+          - comparison_operator: empty
+            id: missing-serial
+            value: ''
+            varType: string
+            variable_selector:
+            - start
+            - serial_no
+          - comparison_operator: empty
+            id: missing-proof
+            value: ''
+            varType: string
+            variable_selector:
+            - start
+            - purchase_proof_url
+          - comparison_operator: empty
+            id: missing-component
+            value: ''
+            varType: string
+            variable_selector:
+            - start
+            - component
+          - comparison_operator: empty
+            id: missing-photos
+            value: ''
+            varType: string
+            variable_selector:
+            - start
+            - photo_urls
+          - comparison_operator: empty
+            id: missing-region
+            value: ''
+            varType: string
+            variable_selector:
+            - start
+            - region
+          - comparison_operator: empty
+            id: missing-usage
+            value: ''
+            varType: string
+            variable_selector:
+            - start
+            - usage_description
+          id: missing_required_fields
+          logical_operator: or
+        desc: Warranty precheck cannot run without complete intake.
+        selected: false
+        title: Required Fields Gate
+        type: if-else
+      height: 220
+      id: required_fields_gate
+      position:
+        x: 638
+        y: 260
+      positionAbsolute:
+        x: 638
+        y: 260
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: Missing warranty intake details.
+        outputs:
+        - value: Warranty precheck requires model, model year, serial number, purchase proof, component, photos, region, and usage description.
+          value_type: string
+          variable: message
+        selected: false
+        title: Missing Fields End
+        type: end
+      height: 100
+      id: missing_fields_end
+      position:
+        x: 942
+        y: 60
+      positionAbsolute:
+        x: 942
+        y: 60
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        dataset_ids:
+        - warranty_policy
+        - service_bulletins
+        - safety_annotations
+        desc: Retrieve policy context only for explanation. Final eligibility must come from the rules service.
+        metadata_filtering_conditions:
+          logical_operator: and
+          conditions:
+          - name: warranty_region
+            comparison_operator: is
+            value: '{{#start.region#}}'
+          - name: model
+            comparison_operator: is_or_empty
+            value: '{{#start.model#}}'
+          - name: model_year
+            comparison_operator: is_or_empty
+            value: '{{#start.model_year#}}'
+          - name: document_type
+            comparison_operator: in
+            value:
+            - warranty_policy
+            - service_bulletin
+            - safety
+          - name: status
+            comparison_operator: is
+            value: published
+          - name: legal_approved
+            comparison_operator: is
+            value: true
+        multiple_retrieval_config:
+          reranking_enable: true
+          top_k: 6
+          score_threshold: 0.6
+        query: |-
+          Warranty policy for {{#start.model#}} {{#start.model_year#}}, component {{#start.component#}}, region {{#start.region#}}.
+        selected: false
+        title: Warranty Policy Retrieval
+        type: knowledge-retrieval
+      height: 190
+      id: warranty_policy_retrieval
+      position:
+        x: 942
+        y: 260
+      positionAbsolute:
+        x: 942
+        y: 260
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        authorization:
+          type: no-auth
+        body:
+          data: |-
+            {
+              "model": "{{#start.model#}}",
+              "model_year": "{{#start.model_year#}}",
+              "serial_no": "{{#start.serial_no#}}",
+              "purchase_proof_url": "{{#start.purchase_proof_url#}}",
+              "component": "{{#start.component#}}",
+              "photo_urls": "{{#start.photo_urls#}}",
+              "region": "{{#start.region#}}",
+              "usage_description": "{{#start.usage_description#}}",
+              "customer_id": "{{#start.customer_id#}}"
+            }
+          type: json
+        desc: Authoritative rules service for serial validation, warranty period, component coverage, exclusions, recall flags, and evidence completeness.
+        headers: 'Content-Type: application/json'
+        method: POST
+        params: ''
+        retry_config:
+          enabled: false
+          max_retries: 1
+          retry_interval: 1000
+        selected: false
+        timeout:
+          connect: 10
+          read: 45
+          write: 30
+        title: Warranty Rules Service
+        type: http-request
+        url: '{{#env.BIKE_BRAND_WARRANTY_API_BASE_URL#}}/warranty/rules/check'
+      height: 180
+      id: warranty_rules_service
+      position:
+        x: 1246
+        y: 260
+      positionAbsolute:
+        x: 1246
+        y: 260
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        cases:
+        - case_id: requires_human_review
+          conditions:
+          - comparison_operator: contains
+            id: requires-human-review-status
+            value: requires_human_review
+            varType: string
+            variable_selector:
+            - warranty_rules_service
+            - body
+          - comparison_operator: contains
+            id: incomplete-evidence-status
+            value: incomplete_evidence
+            varType: string
+            variable_selector:
+            - warranty_rules_service
+            - body
+          id: requires_human_review
+          logical_operator: or
+        - case_id: create_ticket
+          conditions:
+          - comparison_operator: contains
+            id: create-ticket-status
+            value: create_ticket
+            varType: string
+            variable_selector:
+            - warranty_rules_service
+            - body
+          - comparison_operator: contains
+            id: eligible-status
+            value: eligible
+            varType: string
+            variable_selector:
+            - warranty_rules_service
+            - body
+          id: create_ticket
+          logical_operator: or
+        desc: Route based only on rules service status, never LLM judgment.
+        selected: false
+        title: Decision Gate
+        type: if-else
+      height: 180
+      id: decision_gate
+      position:
+        x: 1550
+        y: 260
+      positionAbsolute:
+        x: 1550
+        y: 260
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: Human review for safety signals, unclear evidence, exclusions, or policy conflict.
+        form_schema:
+        - label: Warranty intake
+          required: true
+          variable: warranty_intake
+          value: '{{#start#}}'
+        - label: Rules service result
+          required: true
+          variable: rules_result
+          value: '{{#warranty_rules_service.body#}}'
+        reviewers:
+        - warranty_specialist
+        - safety_team
+        selected: false
+        title: Human Review
+        type: human-input
+      height: 160
+      id: human_review
+      position:
+        x: 1854
+        y: 80
+      positionAbsolute:
+        x: 1854
+        y: 80
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        authorization:
+          type: no-auth
+        body:
+          data: |-
+            {
+              "customer_id": "{{#start.customer_id#}}",
+              "model": "{{#start.model#}}",
+              "model_year": "{{#start.model_year#}}",
+              "serial_no": "{{#start.serial_no#}}",
+              "component": "{{#start.component#}}",
+              "region": "{{#start.region#}}",
+              "photo_urls": "{{#start.photo_urls#}}",
+              "purchase_proof_url": "{{#start.purchase_proof_url#}}",
+              "rules_result": "{{#warranty_rules_service.body#}}",
+              "human_review_result": "{{#human_review.result#}}"
+            }
+          type: json
+        desc: Create or escalate a warranty/service ticket after rules check or human review.
+        headers: 'Content-Type: application/json'
+        method: POST
+        params: ''
+        retry_config:
+          enabled: false
+          max_retries: 1
+          retry_interval: 1000
+        selected: false
+        timeout:
+          connect: 10
+          read: 30
+          write: 30
+        title: Ticket Escalation
+        type: http-request
+        url: '{{#env.BIKE_BRAND_TICKET_API_BASE_URL#}}/tickets'
+      height: 180
+      id: ticket_escalation
+      position:
+        x: 2158
+        y: 160
+      positionAbsolute:
+        x: 2158
+        y: 160
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: Rules service says no immediate ticket is needed.
+        outputs:
+        - value_selector:
+          - warranty_rules_service
+          - body
+          value_type: string
+          variable: precheck_result
+        - value_selector:
+          - warranty_policy_retrieval
+          - result
+          value_type: array[object]
+          variable: policy_citations
+        - value: Warranty precheck is informational. Final approval requires authorized review where policy requires it.
+          value_type: string
+          variable: disclaimer
+        selected: false
+        title: Precheck End
+        type: end
+      height: 150
+      id: precheck_end
+      position:
+        x: 1854
+        y: 380
+      positionAbsolute:
+        x: 1854
+        y: 380
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: Ticket or human escalation output.
+        outputs:
+        - value_selector:
+          - ticket_escalation
+          - body
+          value_type: string
+          variable: ticket_result
+        - value_selector:
+          - warranty_rules_service
+          - body
+          value_type: string
+          variable: rules_result
+        - value: Escalated to human review or service ticket queue.
+          value_type: string
+          variable: escalation_status
+        selected: false
+        title: Escalated End
+        type: end
+      height: 150
+      id: escalated_end
+      position:
+        x: 2462
+        y: 160
+      positionAbsolute:
+        x: 2462
+        y: 160
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    viewport:
+      x: 0
+      y: 0
+      zoom: 0.6
+x_static_validation:
+  importability: dsl_skeleton_close_to_dify_0_3_1
+  required_collected_inputs:
+  - model
+  - model_year
+  - serial_no
+  - purchase_proof_url
+  - component
+  - photo_urls
+  - region
+  - usage_description
+  required_nodes:
+  - start
+  - if-else
+  - knowledge-retrieval
+  - http-request
+  - human-input
+  - end
+  authoritative_decision_source: warranty_rules_service
+  no_llm_final_eligibility: true
+  required_tool_placeholders:
+  - /warranty/rules/check
+  - /tickets
+  safety_escalation_terms:
+  - smoke
+  - fire
+  - swelling
+  - brake_failure
+  - frame_crack
+  human_review_triggers:
+  - safety_escalation
+  - requires_human_review
+  - incomplete_evidence
+  - policy_conflict
+  outputs:
+  - precheck_result
+  - policy_citations
+  - ticket_result
+  - escalation_status

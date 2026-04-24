@@ -1,0 +1,206 @@
+{
+  "$schema": "./ingestion_checklist.schema.json",
+  "version": "1.0.0",
+  "last_updated": "2026-04-24",
+  "blocking_policy": "all_blocking_checks_must_pass",
+  "checklist": [
+    {
+      "id": "P0-KB-001",
+      "name": "Metadata completeness",
+      "applies_to_domains": [
+        "all"
+      ],
+      "blocking": true,
+      "requirement": "Every ingestible chunk must include the full metadata.schema.json field set, using null or empty arrays only where the schema permits.",
+      "evidence": [
+        "Chunk metadata JSON object",
+        "Source document ID",
+        "Chunk ID"
+      ],
+      "static_validation": [
+        "Validate each chunk metadata object against metadata.schema.json.",
+        "Reject additionalProperties not declared in metadata.schema.json.",
+        "Reject missing brand, language, country, market, audience, channel, document_type, effective_date, version, status, risk_level, legal_approved, safety_related, related_part_ids, and compatible_model_ids."
+      ]
+    },
+    {
+      "id": "P0-KB-002",
+      "name": "Domain and audience isolation",
+      "applies_to_domains": [
+        "all"
+      ],
+      "blocking": true,
+      "requirement": "Each source must be assigned to exactly one P0 knowledge domain and the chunk audience must be allowed by that domain.",
+      "evidence": [
+        "knowledge_domain metadata",
+        "audience metadata",
+        "knowledge_domains.json domain rule"
+      ],
+      "static_validation": [
+        "knowledge_domain must be one of the six configured domain keys.",
+        "metadata.audience must be included in knowledge_domains.json domains[knowledge_domain].allowed_audiences.",
+        "metadata.document_type must be included in knowledge_domains.json domains[knowledge_domain].allowed_document_types."
+      ]
+    },
+    {
+      "id": "P0-KB-003",
+      "name": "PII and confidential data redaction",
+      "applies_to_domains": [
+        "all"
+      ],
+      "blocking": true,
+      "requirement": "Personal data, customer identifiers, order numbers, tickets, private dealer notes, and raw photos or videos must be redacted before static knowledge ingestion.",
+      "evidence": [
+        "pii_redacted=true metadata",
+        "Redaction report or reviewer sign-off",
+        "Security classification"
+      ],
+      "static_validation": [
+        "Published chunks must have pii_redacted=true.",
+        "Dealer, internal, service, support_agent, or sales audience chunks must use restricted or confidential security_classification.",
+        "Public consumer chunks must not use confidential security_classification."
+      ]
+    },
+    {
+      "id": "P0-KB-004",
+      "name": "Legal and safety approval",
+      "applies_to_domains": [
+        "warranty_policy",
+        "safety_and_recall",
+        "manuals_and_service",
+        "dealer_internal"
+      ],
+      "blocking": true,
+      "requirement": "Policy, legal, recall, safety, and high-risk service content must be approved before publication and must retain versioned approved wording.",
+      "evidence": [
+        "legal_approved=true metadata",
+        "Approval owner or ticket reference in source governance system",
+        "Version and effective date"
+      ],
+      "static_validation": [
+        "If safety_related=true, legal_approved must be true and risk_level must be high or critical.",
+        "If document_type is safety_notice or recall_notice, knowledge_domain must be safety_and_recall.",
+        "If document_type is safety_notice or recall_notice, safety_related must be true."
+      ]
+    },
+    {
+      "id": "P0-KB-005",
+      "name": "Lifecycle and expiration policy",
+      "applies_to_domains": [
+        "all"
+      ],
+      "blocking": true,
+      "requirement": "Current answers may only use published chunks with effective_date set; time-bound policies, announcements, service bulletins, and recalls must include valid_until or an explicit null for still-active content.",
+      "evidence": [
+        "effective_date metadata",
+        "valid_until metadata",
+        "status metadata"
+      ],
+      "static_validation": [
+        "status must be draft, review, legal_review, published, deprecated, or archived.",
+        "Only status=published chunks are eligible for production retrieval.",
+        "valid_until must be a date or null; deprecated and archived chunks must not be used unless explicitly requested for historical context."
+      ]
+    },
+    {
+      "id": "P0-KB-006",
+      "name": "Chunking strategy selected",
+      "applies_to_domains": [
+        "all"
+      ],
+      "blocking": true,
+      "requirement": "The ingestion job must apply the chunking mode, token range, overlap, and boundary rules configured for the target knowledge domain.",
+      "evidence": [
+        "knowledge_domains.json recommended_chunking_strategy",
+        "Ingestion job configuration",
+        "Chunk preview sample"
+      ],
+      "static_validation": [
+        "Target domain must have recommended_chunking_strategy.mode.",
+        "Target domain must have target_tokens.min and target_tokens.max.",
+        "Target domain must have at least one boundary_rules entry."
+      ]
+    },
+    {
+      "id": "P0-KB-007",
+      "name": "Retrieval filters configured",
+      "applies_to_domains": [
+        "all"
+      ],
+      "blocking": true,
+      "requirement": "The consuming Dify app or external retrieval layer must apply domain-level metadata filters before answer generation.",
+      "evidence": [
+        "knowledge_domains.json retrieval_strategy",
+        "App retrieval configuration",
+        "Evaluation trace showing filters"
+      ],
+      "static_validation": [
+        "Each domain retrieval_strategy.metadata_filters must include knowledge_domain, language, country, market, audience, and status unless a stricter domain-specific list is configured.",
+        "Each domain retrieval_strategy must set rerank=true for P0.",
+        "Each domain retrieval_strategy.minimum_score must be between 0 and 1."
+      ]
+    },
+    {
+      "id": "P0-KB-008",
+      "name": "Static versus dynamic knowledge separation",
+      "applies_to_domains": [
+        "consumer_support",
+        "product_catalog",
+        "warranty_policy",
+        "dealer_internal",
+        "safety_and_recall"
+      ],
+      "blocking": true,
+      "requirement": "Dynamic facts such as inventory, price, order status, ticket status, appointment availability, serial-number recall hits, and final warranty decisions must not be ingested as static knowledge.",
+      "evidence": [
+        "Source classification",
+        "External tool or rules service owner",
+        "Rejected dynamic content log when applicable"
+      ],
+      "static_validation": [
+        "document_type must not be used to represent live order, inventory, price, ticket, appointment, or serial-number status.",
+        "Compatibility and warranty chunks may explain policy or evidence requirements, but final decisions must route to external_rule_service or human review."
+      ]
+    },
+    {
+      "id": "P0-KB-009",
+      "name": "Annotation candidate coverage",
+      "applies_to_domains": [
+        "warranty_policy",
+        "safety_and_recall",
+        "manuals_and_service"
+      ],
+      "blocking": true,
+      "requirement": "High-risk and legally sensitive questions must have annotation-first coverage before the related content is enabled for production retrieval.",
+      "evidence": [
+        "annotation_guardrails.json matched category",
+        "Approved annotation answer",
+        "Citation source document"
+      ],
+      "static_validation": [
+        "safety_and_recall annotation_policy.required must be true.",
+        "warranty_policy annotation_policy.required must be true.",
+        "Each annotation_first_categories item must include use_annotation_first and cite_official_source in required_actions."
+      ]
+    },
+    {
+      "id": "P0-KB-010",
+      "name": "Source provenance",
+      "applies_to_domains": [
+        "all"
+      ],
+      "blocking": true,
+      "requirement": "Each chunk must trace back to a governed source document and owner team so replacement, rollback, and audit are possible.",
+      "evidence": [
+        "source_document_id metadata",
+        "source_uri metadata where available",
+        "owner_team metadata"
+      ],
+      "static_validation": [
+        "source_document_id must match metadata.schema.json pattern.",
+        "owner_team must be one of the allowed metadata.schema.json owner_team values.",
+        "source_uri must be a URI reference or null."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,520 @@
+{
+  "$schema": "./knowledge_domains.schema.json",
+  "version": "1.0.0",
+  "last_updated": "2026-04-24",
+  "domains": {
+    "consumer_support": {
+      "domain_id": "consumer_support",
+      "display_name": "Consumer Support",
+      "purpose": "Public FAQ, after-sales guidance, basic troubleshooting, store/service routing, and support handoff for consumers.",
+      "allowed_audiences": [
+        "consumer",
+        "support_agent"
+      ],
+      "allowed_document_types": [
+        "faq",
+        "announcement",
+        "maintenance_guide",
+        "assembly_guide",
+        "shipping_policy",
+        "return_policy"
+      ],
+      "required_metadata": [
+        "brand",
+        "language",
+        "country",
+        "market",
+        "audience",
+        "channel",
+        "document_type",
+        "issue_category",
+        "effective_date",
+        "valid_until",
+        "version",
+        "status",
+        "risk_level",
+        "legal_approved",
+        "safety_related"
+      ],
+      "recommended_chunking_strategy": {
+        "mode": "qa_pairs",
+        "target_tokens": {
+          "min": 120,
+          "max": 500
+        },
+        "overlap_tokens": 40,
+        "boundary_rules": [
+          "Keep each question and answer together.",
+          "Split by intent before splitting by page section.",
+          "Do not merge consumer text with dealer-only service instructions."
+        ],
+        "indexing": "high_quality"
+      },
+      "retrieval_strategy": {
+        "metadata_filters": [
+          "knowledge_domain",
+          "language",
+          "country",
+          "market",
+          "audience",
+          "channel",
+          "document_type",
+          "status"
+        ],
+        "top_k": 5,
+        "rerank": true,
+        "minimum_score": 0.62,
+        "fallback": "ask_clarifying_question"
+      },
+      "prohibited_mixing_rules": [
+        "Do not retrieve dealer_internal content for public consumer answers.",
+        "Do not answer current policy questions from deprecated or archived chunks.",
+        "Do not use static knowledge for order status, logistics, inventory, ticket status, or appointment availability."
+      ],
+      "annotation_policy": {
+        "required": false,
+        "required_for": [
+          "published answers about return windows",
+          "warranty eligibility summaries",
+          "questions that mention battery smoke, fire, swelling, brake failure, or frame cracks"
+        ]
+      }
+    },
+    "product_catalog": {
+      "domain_id": "product_catalog",
+      "display_name": "Product Catalog",
+      "purpose": "Model facts, year-specific specifications, fit guidance, sales comparison facts, and catalog-visible accessory notes.",
+      "allowed_audiences": [
+        "consumer",
+        "dealer",
+        "support_agent",
+        "sales"
+      ],
+      "allowed_document_types": [
+        "product_spec",
+        "sales_playbook",
+        "compatibility_note",
+        "announcement"
+      ],
+      "required_metadata": [
+        "brand",
+        "series",
+        "model",
+        "model_year",
+        "language",
+        "country",
+        "market",
+        "audience",
+        "bike_type",
+        "drive_system_vendor",
+        "battery_model",
+        "display_model",
+        "component_vendor",
+        "document_type",
+        "effective_date",
+        "version",
+        "status",
+        "compatible_model_ids"
+      ],
+      "recommended_chunking_strategy": {
+        "mode": "structured_records",
+        "target_tokens": {
+          "min": 150,
+          "max": 700
+        },
+        "overlap_tokens": 20,
+        "boundary_rules": [
+          "Keep one model-year record per chunk where possible.",
+          "Keep specs, sizing, battery, drive system, display, and component facts under explicit headings.",
+          "Compatibility claims must retain related part IDs and compatible model IDs."
+        ],
+        "indexing": "structured_external_plus_rag"
+      },
+      "retrieval_strategy": {
+        "metadata_filters": [
+          "knowledge_domain",
+          "brand",
+          "series",
+          "model",
+          "model_year",
+          "language",
+          "country",
+          "market",
+          "audience",
+          "bike_type",
+          "status"
+        ],
+        "top_k": 8,
+        "rerank": true,
+        "minimum_score": 0.65,
+        "fallback": "external_rule_service"
+      },
+      "prohibited_mixing_rules": [
+        "Do not merge different model years into one compatibility answer without explicit compatible_model_ids.",
+        "Do not let RAG make final accessory, battery, controller, display, or spare-part compatibility decisions.",
+        "Do not mix product availability or price from static catalog chunks; use live product or commerce APIs."
+      ],
+      "annotation_policy": {
+        "required": false,
+        "required_for": [
+          "third-party component warranty ownership",
+          "known incompatible accessory combinations",
+          "published sales claims requiring legal approval"
+        ]
+      }
+    },
+    "manuals_and_service": {
+      "domain_id": "manuals_and_service",
+      "display_name": "Manuals and Service",
+      "purpose": "Owner manuals, assembly guides, maintenance guides, error code references, and authorized service procedures.",
+      "allowed_audiences": [
+        "consumer",
+        "dealer",
+        "support_agent",
+        "service"
+      ],
+      "allowed_document_types": [
+        "manual",
+        "service_manual",
+        "assembly_guide",
+        "maintenance_guide",
+        "error_code_reference",
+        "service_bulletin"
+      ],
+      "required_metadata": [
+        "brand",
+        "series",
+        "model",
+        "model_year",
+        "language",
+        "country",
+        "market",
+        "audience",
+        "bike_type",
+        "drive_system_vendor",
+        "battery_model",
+        "display_model",
+        "component_vendor",
+        "document_type",
+        "issue_category",
+        "effective_date",
+        "version",
+        "status",
+        "risk_level",
+        "safety_related",
+        "related_error_codes"
+      ],
+      "recommended_chunking_strategy": {
+        "mode": "parent_child",
+        "target_tokens": {
+          "min": 300,
+          "max": 1200
+        },
+        "overlap_tokens": 120,
+        "boundary_rules": [
+          "Preserve chapter, section, warning, step list, table, and error-code boundaries.",
+          "Keep warnings with the procedure they constrain.",
+          "Do not split a troubleshooting decision tree across unrelated chunks."
+        ],
+        "indexing": "high_quality_with_parent_child"
+      },
+      "retrieval_strategy": {
+        "metadata_filters": [
+          "knowledge_domain",
+          "brand",
+          "model",
+          "model_year",
+          "language",
+          "country",
+          "market",
+          "audience",
+          "drive_system_vendor",
+          "battery_model",
+          "display_model",
+          "component_vendor",
+          "document_type",
+          "status"
+        ],
+        "top_k": 8,
+        "rerank": true,
+        "minimum_score": 0.68,
+        "fallback": "route_to_human"
+      },
+      "prohibited_mixing_rules": [
+        "Do not expose dealer-only service_manual or service_bulletin chunks to consumer channels.",
+        "Do not provide DIY instructions for high-voltage battery repair, drive-system disassembly, brake failure, or frame crack remediation.",
+        "Do not answer model-specific error codes without model_year and drive_system_vendor filters when those fields are available."
+      ],
+      "annotation_policy": {
+        "required": false,
+        "required_for": [
+          "battery handling warnings",
+          "must-visit-authorized-service instructions",
+          "error codes that require dealer diagnostics"
+        ]
+      }
+    },
+    "warranty_policy": {
+      "domain_id": "warranty_policy",
+      "display_name": "Warranty Policy",
+      "purpose": "Warranty, return, refund, shipping, financing, legal complaint, and market-specific policy content.",
+      "allowed_audiences": [
+        "consumer",
+        "dealer",
+        "support_agent",
+        "legal"
+      ],
+      "allowed_document_types": [
+        "warranty_policy",
+        "return_policy",
+        "shipping_policy",
+        "announcement",
+        "faq"
+      ],
+      "required_metadata": [
+        "brand",
+        "language",
+        "country",
+        "market",
+        "audience",
+        "channel",
+        "document_type",
+        "policy_type",
+        "warranty_region",
+        "effective_date",
+        "valid_until",
+        "version",
+        "status",
+        "risk_level",
+        "legal_approved"
+      ],
+      "recommended_chunking_strategy": {
+        "mode": "short_blocks",
+        "target_tokens": {
+          "min": 120,
+          "max": 450
+        },
+        "overlap_tokens": 30,
+        "boundary_rules": [
+          "Split by policy clause, eligibility condition, exclusion, required evidence, and escalation path.",
+          "Keep dates, region, proof-of-purchase requirements, and authorized dealer requirements in the same chunk.",
+          "Do not merge active and expired policy text."
+        ],
+        "indexing": "high_quality"
+      },
+      "retrieval_strategy": {
+        "metadata_filters": [
+          "knowledge_domain",
+          "language",
+          "country",
+          "market",
+          "audience",
+          "policy_type",
+          "warranty_region",
+          "effective_date",
+          "valid_until",
+          "status"
+        ],
+        "top_k": 6,
+        "rerank": true,
+        "minimum_score": 0.7,
+        "fallback": "annotation_first"
+      },
+      "prohibited_mixing_rules": [
+        "Do not mix warranty or return policies across countries, markets, or warranty regions.",
+        "Do not make final warranty approval decisions from RAG; route final eligibility to the warranty rules service or human review.",
+        "Do not use expired policy chunks unless the user explicitly asks about the historical period covered by that policy."
+      ],
+      "annotation_policy": {
+        "required": true,
+        "required_for": [
+          "return window",
+          "warranty period",
+          "proof-of-purchase requirement",
+          "authorized dealer requirement",
+          "third-party component warranty ownership",
+          "policy exclusions"
+        ]
+      }
+    },
+    "dealer_internal": {
+      "domain_id": "dealer_internal",
+      "display_name": "Dealer Internal",
+      "purpose": "Dealer portal guidance, authorized service SOPs, training, service bulletins, parts ordering, and internal support playbooks.",
+      "allowed_audiences": [
+        "dealer",
+        "internal",
+        "support_agent",
+        "sales",
+        "service"
+      ],
+      "allowed_document_types": [
+        "dealer_sop",
+        "training",
+        "service_bulletin",
+        "service_manual",
+        "sales_playbook",
+        "compatibility_note"
+      ],
+      "required_metadata": [
+        "brand",
+        "language",
+        "country",
+        "market",
+        "audience",
+        "channel",
+        "document_type",
+        "effective_date",
+        "valid_until",
+        "version",
+        "status",
+        "risk_level",
+        "security_classification",
+        "legal_approved"
+      ],
+      "recommended_chunking_strategy": {
+        "mode": "section_hierarchy",
+        "target_tokens": {
+          "min": 250,
+          "max": 900
+        },
+        "overlap_tokens": 80,
+        "boundary_rules": [
+          "Preserve SOP step order, role ownership, required evidence, and escalation thresholds.",
+          "Keep service bulletin applicability tables with the bulletin summary.",
+          "Separate training talk tracks from enforceable SOPs."
+        ],
+        "indexing": "high_quality_with_parent_child"
+      },
+      "retrieval_strategy": {
+        "metadata_filters": [
+          "knowledge_domain",
+          "language",
+          "country",
+          "market",
+          "audience",
+          "channel",
+          "document_type",
+          "security_classification",
+          "status"
+        ],
+        "top_k": 8,
+        "rerank": true,
+        "minimum_score": 0.72,
+        "fallback": "route_to_human"
+      },
+      "prohibited_mixing_rules": [
+        "Do not expose dealer_internal chunks to public-support, web, or app channels.",
+        "Do not mix internal sales playbooks with consumer-facing product claims unless a published consumer source also supports the claim.",
+        "Do not retrieve confidential dealer pricing, parts ordering, or escalation SOP content for consumer answers."
+      ],
+      "annotation_policy": {
+        "required": false,
+        "required_for": [
+          "mandatory escalation SOPs",
+          "dealer-only service restrictions",
+          "confidential policy exceptions"
+        ]
+      }
+    },
+    "safety_and_recall": {
+      "domain_id": "safety_and_recall",
+      "display_name": "Safety and Recall",
+      "purpose": "Safety notices, recall announcements, battery safety, braking safety, frame safety, and legally approved high-risk answer sources.",
+      "allowed_audiences": [
+        "consumer",
+        "dealer",
+        "support_agent",
+        "service",
+        "legal",
+        "safety_quality"
+      ],
+      "allowed_document_types": [
+        "safety_notice",
+        "recall_notice",
+        "service_bulletin",
+        "faq",
+        "announcement"
+      ],
+      "required_metadata": [
+        "brand",
+        "series",
+        "model",
+        "model_year",
+        "language",
+        "country",
+        "market",
+        "audience",
+        "channel",
+        "document_type",
+        "policy_type",
+        "issue_category",
+        "effective_date",
+        "valid_until",
+        "version",
+        "status",
+        "risk_level",
+        "legal_approved",
+        "safety_related",
+        "related_part_ids",
+        "compatible_model_ids"
+      ],
+      "recommended_chunking_strategy": {
+        "mode": "short_blocks",
+        "target_tokens": {
+          "min": 80,
+          "max": 350
+        },
+        "overlap_tokens": 20,
+        "boundary_rules": [
+          "Keep the hazard, immediate action, affected models, affected parts, and escalation path in one chunk.",
+          "Do not split official recall identifiers from the affected model or date range.",
+          "Keep legally approved wording intact."
+        ],
+        "indexing": "high_quality"
+      },
+      "retrieval_strategy": {
+        "metadata_filters": [
+          "knowledge_domain",
+          "brand",
+          "series",
+          "model",
+          "model_year",
+          "language",
+          "country",
+          "market",
+          "audience",
+          "issue_category",
+          "risk_level",
+          "legal_approved",
+          "safety_related",
+          "status"
+        ],
+        "top_k": 6,
+        "rerank": true,
+        "minimum_score": 0.78,
+        "fallback": "annotation_first"
+      },
+      "prohibited_mixing_rules": [
+        "Do not let the model freely generate safety advice when an annotation rule matches.",
+        "Do not provide battery disassembly, damaged battery charging, brake failure riding, or frame crack riding instructions.",
+        "Do not answer recall batch or serial-number hit/miss from static RAG; use the recall or serial-number rules service."
+      ],
+      "annotation_policy": {
+        "required": true,
+        "required_for": [
+          "battery swelling",
+          "battery odor",
+          "smoke",
+          "fire",
+          "water ingress",
+          "short circuit",
+          "brake failure",
+          "frame crack",
+          "recall notice",
+          "serial-number recall lookup"
+        ]
+      }
+    }
+  }
+}

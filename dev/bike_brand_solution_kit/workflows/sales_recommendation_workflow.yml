@@ -1,0 +1,499 @@
+app:
+  description: P0 sales recommendation workflow for bicycle and e-bike shoppers.
+  icon: sales
+  icon_background: '#DCFCE7'
+  mode: workflow
+  name: sales_recommendation_workflow
+  use_icon_as_answer_icon: false
+dependencies: []
+kind: app
+version: 0.3.1
+workflow:
+  conversation_variables: []
+  environment_variables:
+  - name: BIKE_BRAND_PRODUCT_API_BASE_URL
+    value: https://product-api.example.com
+  - name: BIKE_BRAND_CRM_API_BASE_URL
+    value: https://crm-api.example.com
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: ''
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: true
+    speech_to_text:
+      enabled: false
+    suggested_questions: []
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: if-else
+      id: start-to-required-fields-gate
+      source: start
+      sourceHandle: source
+      target: required_fields_gate
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: if-else
+        targetType: end
+      id: missing-fields-to-end
+      source: required_fields_gate
+      sourceHandle: missing_required_fields
+      target: missing_fields_end
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: if-else
+        targetType: knowledge-retrieval
+      id: complete-fields-to-product-retrieval
+      source: required_fields_gate
+      sourceHandle: false
+      target: product_retrieval
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: knowledge-retrieval
+        targetType: http-request
+      id: product-retrieval-to-price-stock-tool
+      source: product_retrieval
+      sourceHandle: source
+      target: price_inventory_tool
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: http-request
+        targetType: llm
+      id: price-stock-tool-to-recommendation-llm
+      source: price_inventory_tool
+      sourceHandle: source
+      target: recommendation_llm
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: end
+      id: recommendation-llm-to-end
+      source: recommendation_llm
+      sourceHandle: source
+      target: recommendation_end
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        desc: Collect shopper requirements. BFF can provide lead id and market context.
+        selected: false
+        title: Start
+        type: start
+        variables:
+        - label: use_case
+          max_length: 300
+          options:
+          - commute
+          - fitness
+          - cargo
+          - family
+          - trail
+          - mixed
+          required: true
+          type: select
+          variable: use_case
+        - label: budget_range
+          max_length: 80
+          options: []
+          required: true
+          type: text-input
+          variable: budget_range
+        - label: rider_height_cm
+          max_length: 10
+          options: []
+          required: true
+          type: number
+          variable: rider_height_cm
+        - label: commute_distance_km
+          max_length: 10
+          options: []
+          required: true
+          type: number
+          variable: commute_distance_km
+        - label: terrain
+          max_length: 80
+          options:
+          - flat_city
+          - hills
+          - mixed_pavement
+          - gravel
+          - trail
+          required: true
+          type: select
+          variable: terrain
+        - label: cargo_need
+          max_length: 120
+          options:
+          - none
+          - laptop_bag
+          - groceries
+          - child_seat
+          - heavy_cargo
+          required: true
+          type: select
+          variable: cargo_need
+        - label: market
+          max_length: 80
+          options: []
+          required: true
+          type: text-input
+          variable: market
+        - label: language
+          max_length: 20
+          options: []
+          required: true
+          type: text-input
+          variable: language
+        - label: lead_id
+          max_length: 120
+          options: []
+          required: false
+          type: text-input
+          variable: lead_id
+      height: 220
+      id: start
+      position:
+        x: 30
+        y: 240
+      positionAbsolute:
+        x: 30
+        y: 240
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        cases:
+        - case_id: missing_required_fields
+          conditions:
+          - comparison_operator: empty
+            id: missing-use-case
+            value: ''
+            varType: string
+            variable_selector:
+            - start
+            - use_case
+          - comparison_operator: empty
+            id: missing-budget
+            value: ''
+            varType: string
+            variable_selector:
+            - start
+            - budget_range
+          - comparison_operator: empty
+            id: missing-height
+            value: ''
+            varType: number
+            variable_selector:
+            - start
+            - rider_height_cm
+          - comparison_operator: empty
+            id: missing-distance
+            value: ''
+            varType: number
+            variable_selector:
+            - start
+            - commute_distance_km
+          - comparison_operator: empty
+            id: missing-terrain
+            value: ''
+            varType: string
+            variable_selector:
+            - start
+            - terrain
+          - comparison_operator: empty
+            id: missing-cargo
+            value: ''
+            varType: string
+            variable_selector:
+            - start
+            - cargo_need
+          id: missing_required_fields
+          logical_operator: or
+        desc: Stop recommendation until all six required shopper inputs are available.
+        selected: false
+        title: Required Fields Gate
+        type: if-else
+      height: 180
+      id: required_fields_gate
+      position:
+        x: 334
+        y: 240
+      positionAbsolute:
+        x: 334
+        y: 240
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: Missing required inputs.
+        outputs:
+        - value: Please provide use case, budget range, rider height, commute distance, terrain, and cargo need before generating bike recommendations.
+          value_type: string
+          variable: message
+        selected: false
+        title: Missing Fields End
+        type: end
+      height: 100
+      id: missing_fields_end
+      position:
+        x: 638
+        y: 60
+      positionAbsolute:
+        x: 638
+        y: 60
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        dataset_ids:
+        - product_models
+        - sizing_guides
+        - accessories_catalog
+        desc: Retrieve static product fit, sizing, range, cargo, and terrain knowledge. Prices and inventory are excluded.
+        metadata_filtering_conditions:
+          logical_operator: and
+          conditions:
+          - name: market
+            comparison_operator: is
+            value: '{{#start.market#}}'
+          - name: language
+            comparison_operator: is
+            value: '{{#start.language#}}'
+          - name: audience
+            comparison_operator: is
+            value: consumer
+          - name: document_type
+            comparison_operator: in
+            value:
+            - product
+            - sizing
+            - accessory
+          - name: status
+            comparison_operator: is
+            value: published
+        multiple_retrieval_config:
+          reranking_enable: true
+          top_k: 10
+          score_threshold: 0.58
+        query: |-
+          Use case: {{#start.use_case#}}
+          Budget range: {{#start.budget_range#}}
+          Rider height cm: {{#start.rider_height_cm#}}
+          Commute distance km: {{#start.commute_distance_km#}}
+          Terrain: {{#start.terrain#}}
+          Cargo need: {{#start.cargo_need#}}
+        selected: false
+        title: Product Retrieval
+        type: knowledge-retrieval
+      height: 180
+      id: product_retrieval
+      position:
+        x: 638
+        y: 240
+      positionAbsolute:
+        x: 638
+        y: 240
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        authorization:
+          type: no-auth
+        body:
+          data: |-
+            {
+              "market": "{{#start.market#}}",
+              "budget_range": "{{#start.budget_range#}}",
+              "use_case": "{{#start.use_case#}}",
+              "terrain": "{{#start.terrain#}}",
+              "cargo_need": "{{#start.cargo_need#}}",
+              "candidate_models_from_retrieval": "{{#product_retrieval.result#}}"
+            }
+          type: json
+        desc: Required tool call for live price, promotion eligibility, and inventory. Recommendation must not invent these fields.
+        headers: 'Content-Type: application/json'
+        method: POST
+        params: ''
+        retry_config:
+          enabled: false
+          max_retries: 1
+          retry_interval: 1000
+        selected: false
+        timeout:
+          connect: 10
+          read: 30
+          write: 30
+        title: Price And Inventory Tool
+        type: http-request
+        url: '{{#env.BIKE_BRAND_PRODUCT_API_BASE_URL#}}/products/recommendation-context'
+      height: 170
+      id: price_inventory_tool
+      position:
+        x: 942
+        y: 240
+      positionAbsolute:
+        x: 942
+        y: 240
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        context:
+          enabled: true
+          variable_selector:
+          - product_retrieval
+          - result
+        desc: Generate 1-3 grounded recommendations.
+        memory:
+          query_prompt_template: ''
+          window:
+            enabled: false
+            size: 0
+        model:
+          completion_params:
+            temperature: 0.2
+          mode: chat
+          name: ''
+          provider: ''
+        prompt_template:
+        - role: system
+          text: |-
+            You are a sales recommendation workflow.
+            Recommend 1 to 3 bike models only when the product knowledge and the price_inventory_tool output support them.
+            Price, live discount, availability, and inventory must come from price_inventory_tool. If the tool omits a field, mark it unavailable and do not infer it.
+            Match use case, budget, rider height, commute distance, terrain, and cargo need explicitly.
+            Return JSON with recommendations, rejected_candidates, missing_tool_fields, citations, and next_best_action.
+        - role: user
+          text: |-
+            Shopper inputs:
+            use_case={{#start.use_case#}}
+            budget_range={{#start.budget_range#}}
+            rider_height_cm={{#start.rider_height_cm#}}
+            commute_distance_km={{#start.commute_distance_km#}}
+            terrain={{#start.terrain#}}
+            cargo_need={{#start.cargo_need#}}
+            Product knowledge: {{#product_retrieval.result#}}
+            Price and inventory tool output: {{#price_inventory_tool.body#}}
+        selected: false
+        title: Recommendation LLM
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 220
+      id: recommendation_llm
+      position:
+        x: 1246
+        y: 240
+      positionAbsolute:
+        x: 1246
+        y: 240
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: Structured sales recommendation output.
+        outputs:
+        - value_selector:
+          - recommendation_llm
+          - text
+          value_type: string
+          variable: recommendation_result
+        - value_selector:
+          - price_inventory_tool
+          - body
+          value_type: string
+          variable: price_inventory_source
+        - value: price_and_inventory_must_come_from_tool
+          value_type: string
+          variable: dynamic_data_policy
+        selected: false
+        title: Recommendation End
+        type: end
+      height: 130
+      id: recommendation_end
+      position:
+        x: 1550
+        y: 240
+      positionAbsolute:
+        x: 1550
+        y: 240
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    viewport:
+      x: 0
+      y: 0
+      zoom: 0.65
+x_static_validation:
+  importability: dsl_skeleton_close_to_dify_0_3_1
+  required_collected_inputs:
+  - use_case
+  - budget_range
+  - rider_height_cm
+  - commute_distance_km
+  - terrain
+  - cargo_need
+  outputs:
+  - recommendation_result
+  - price_inventory_source
+  - dynamic_data_policy
+  recommendation_count:
+    min: 1
+    max: 3
+  required_nodes:
+  - start
+  - if-else
+  - knowledge-retrieval
+  - http-request
+  - llm
+  - end
+  dynamic_data_must_use_tool:
+  - price
+  - promotion
+  - inventory
+  - availability
+  required_tool_placeholders:
+  - /products/recommendation-context
+  citations_required: true
+  safety_constraints:
+  - do_not_recommend_unsafe_accessory_combinations_without_tool_or_rule_support
+  - do_not_infer_current_price_or_stock

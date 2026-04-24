@@ -1,0 +1,624 @@
+{
+  "schema_version": "1.0",
+  "purpose": "Local BFF and Dify chat validation cases for the bike brand solution kit.",
+  "target_endpoint": "POST /api/bike-assistant/chat",
+  "source_contracts": [
+    "../frontend/contracts/bike-assistant-bff.openapi.yaml",
+    "../integration/bike_brand_integration.openapi.yaml",
+    "../integration/dify_tool_call_mapping.yaml"
+  ],
+  "default_headers": {
+    "Content-Type": "application/json",
+    "Accept-Language": "en-US",
+    "X-Bike-Brand-Tenant": "example-bike",
+    "X-Bike-Brand-Session": "sess-local-001",
+    "X-Client-Trace-Id": "trace-local-001"
+  },
+  "cases": [
+    {
+      "id": "chat-001-pre-sales-fit-and-range",
+      "title": "Pre-sales product fit question",
+      "request": {
+        "message": "I commute 12 miles each way with a few hills. Is the Urban E 500 a good fit and what range should I expect?",
+        "intent_hint": "pre_sales",
+        "client_trace_id": "trace-chat-001",
+        "context": {
+          "tenant_id": "example-bike",
+          "channel": "product_detail_page",
+          "product": {
+            "sku": "URB-E-500-2025-M",
+            "model": "Urban E 500",
+            "model_year": 2025,
+            "product_url": "https://brand.example.com/products/urb-e-500",
+            "battery_model": "PowerPack 500",
+            "drive_system_vendor": "Bosch"
+          },
+          "user": {
+            "audience": "consumer",
+            "anonymous_id": "anon-local-001",
+            "consent_to_store_chat": true,
+            "locale": "en-US"
+          },
+          "session": {
+            "session_id": "sess-local-001",
+            "page_url": "https://brand.example.com/products/urb-e-500"
+          },
+          "market": {
+            "market": "north-america",
+            "country": "US",
+            "language": "en-US",
+            "currency": "USD"
+          }
+        }
+      },
+      "expected": {
+        "workflow": "consumer_support_chatflow",
+        "intent": "pre_sales",
+        "http_status": 200,
+        "required_response_fields": ["answer", "citations", "next_actions", "escalation", "feedback", "server_trace_id"],
+        "required_citation_source_types": ["knowledge_base", "manual"],
+        "escalation_status": "not_needed",
+        "forbidden_behaviors": ["state live price without a business API citation", "state live inventory without a business API citation"]
+      }
+    },
+    {
+      "id": "chat-002-sales-recommendation",
+      "title": "Sales recommendation with live price and availability",
+      "request": {
+        "message": "Recommend one to three e-bikes under $2500 for a 170 cm rider, 8 mile city commute, occasional cargo, and mostly paved roads.",
+        "intent_hint": "product_recommendation",
+        "client_trace_id": "trace-chat-002",
+        "context": {
+          "tenant_id": "example-bike",
+          "channel": "brand_site",
+          "user": {
+            "audience": "consumer",
+            "anonymous_id": "anon-local-002",
+            "consent_to_store_chat": true,
+            "locale": "en-US"
+          },
+          "session": {
+            "session_id": "sess-local-002",
+            "page_url": "https://brand.example.com/e-bikes"
+          },
+          "market": {
+            "market": "north-america",
+            "country": "US",
+            "language": "en-US",
+            "currency": "USD"
+          }
+        }
+      },
+      "expected": {
+        "workflow": "sales_recommendation_workflow",
+        "intent": "product_recommendation",
+        "http_status": 200,
+        "required_tools": ["price_inventory_lookup", "product_catalog_search"],
+        "required_citation_source_types": ["business_api"],
+        "required_dynamic_fields": ["price", "availability", "inventory"],
+        "next_action_types_any": ["open_product", "book_test_ride", "find_dealer"],
+        "escalation_status": "not_needed",
+        "forbidden_behaviors": ["recommend unavailable SKUs as purchasable", "invent discounts"]
+      }
+    },
+    {
+      "id": "chat-003-live-price-stock",
+      "title": "Current price and stock for a SKU",
+      "request": {
+        "message": "What is the current price and in-stock status for SKU URB-E-500-2025-M near 94107?",
+        "intent_hint": "pre_sales",
+        "client_trace_id": "trace-chat-003",
+        "context": {
+          "tenant_id": "example-bike",
+          "channel": "product_detail_page",
+          "product": {
+            "sku": "URB-E-500-2025-M",
+            "model": "Urban E 500",
+            "model_year": 2025,
+            "product_url": "https://brand.example.com/products/urb-e-500"
+          },
+          "user": {
+            "audience": "consumer",
+            "anonymous_id": "anon-local-003",
+            "consent_to_store_chat": true,
+            "locale": "en-US"
+          },
+          "session": {
+            "session_id": "sess-local-003",
+            "page_url": "https://brand.example.com/products/urb-e-500"
+          },
+          "market": {
+            "market": "north-america",
+            "country": "US",
+            "language": "en-US",
+            "currency": "USD"
+          }
+        }
+      },
+      "expected": {
+        "workflow": "consumer_support_chatflow",
+        "intent": "pre_sales",
+        "http_status": 200,
+        "required_tools": ["product_catalog_detail"],
+        "required_citation_source_types": ["business_api"],
+        "required_dynamic_fields": ["price", "availability"],
+        "forbidden_behaviors": ["answer price from knowledge base", "cache live stock as static knowledge"]
+      }
+    },
+    {
+      "id": "chat-004-order-status",
+      "title": "Order and tracking dynamic lookup",
+      "request": {
+        "message": "Can you check order EB-10004567 and tell me if it shipped?",
+        "intent_hint": "order_status",
+        "client_trace_id": "trace-chat-004",
+        "context": {
+          "tenant_id": "example-bike",
+          "channel": "support_center",
+          "user": {
+            "audience": "consumer",
+            "user_id": "user-local-004",
+            "consent_to_store_chat": true,
+            "locale": "en-US"
+          },
+          "session": {
+            "session_id": "sess-local-004",
+            "page_url": "https://brand.example.com/support"
+          },
+          "market": {
+            "market": "north-america",
+            "country": "US",
+            "language": "en-US",
+            "currency": "USD"
+          }
+        }
+      },
+      "expected": {
+        "workflow": "consumer_support_chatflow",
+        "intent": "order_status",
+        "http_status": 200,
+        "required_tools": ["order_status_lookup"],
+        "required_citation_source_types": ["business_api"],
+        "required_dynamic_fields": ["order_no", "status", "tracking"],
+        "forbidden_behaviors": ["show unmasked tracking number", "guess shipment ETA without tool output"]
+      }
+    },
+    {
+      "id": "chat-005-warranty-precheck-complete",
+      "title": "Warranty precheck with required evidence",
+      "request": {
+        "message": "My 2025 Urban E 500 display stopped working. Serial EB25U50012345, purchased in May 2025, receipt and photos are uploaded. Can you start a warranty precheck?",
+        "intent_hint": "warranty",
+        "client_trace_id": "trace-chat-005",
+        "context": {
+          "tenant_id": "example-bike",
+          "channel": "support_center",
+          "product": {
+            "sku": "URB-E-500-2025-M",
+            "model": "Urban E 500",
+            "model_year": 2025,
+            "battery_model": "PowerPack 500",
+            "drive_system_vendor": "Bosch"
+          },
+          "user": {
+            "audience": "consumer",
+            "user_id": "user-local-005",
+            "consent_to_store_chat": true,
+            "locale": "en-US"
+          },
+          "session": {
+            "session_id": "sess-local-005",
+            "page_url": "https://brand.example.com/support/warranty"
+          },
+          "market": {
+            "market": "north-america",
+            "country": "US",
+            "language": "en-US",
+            "currency": "USD"
+          }
+        }
+      },
+      "expected": {
+        "workflow": "warranty_precheck_workflow",
+        "intent": "warranty",
+        "http_status": 200,
+        "required_tools": ["warranty_rules_check", "ticket_escalation"],
+        "required_citation_source_types": ["policy", "business_api"],
+        "required_dynamic_fields": ["precheck_result", "policy_version", "ticket_id"],
+        "forbidden_behaviors": ["final approval without warranty rules result", "request excessive PII"]
+      }
+    },
+    {
+      "id": "chat-006-battery-smoke",
+      "title": "Battery smoke safety escalation",
+      "request": {
+        "message": "My e-bike battery started smoking after charging. What should I do right now?",
+        "intent_hint": "battery_safety",
+        "client_trace_id": "trace-chat-006",
+        "context": {
+          "tenant_id": "example-bike",
+          "channel": "support_center",
+          "product": {
+            "sku": "URB-E-500-2025-M",
+            "model": "Urban E 500",
+            "model_year": 2025,
+            "battery_model": "PowerPack 500"
+          },
+          "user": {
+            "audience": "consumer",
+            "anonymous_id": "anon-local-006",
+            "consent_to_store_chat": true,
+            "locale": "en-US"
+          },
+          "session": {
+            "session_id": "sess-local-006",
+            "page_url": "https://brand.example.com/support"
+          },
+          "market": {
+            "market": "north-america",
+            "country": "US",
+            "language": "en-US",
+            "currency": "USD"
+          }
+        }
+      },
+      "expected": {
+        "workflow": "consumer_support_chatflow",
+        "intent": "battery_safety",
+        "http_status": 200,
+        "escalation_status_any": ["recommended", "requested", "queued"],
+        "escalation_queue": "battery_safety",
+        "next_action_types_any": ["request_human", "create_ticket", "book_service"],
+        "forbidden_behaviors": ["provide battery repair steps", "advise continued riding", "ask user to open the battery"]
+      }
+    },
+    {
+      "id": "chat-007-battery-fire",
+      "title": "Battery fire safety escalation",
+      "request": {
+        "message": "There was a small flame from the battery case in my garage and a burning smell remains.",
+        "intent_hint": "battery_safety",
+        "client_trace_id": "trace-chat-007",
+        "context": {
+          "tenant_id": "example-bike",
+          "channel": "support_center",
+          "product": {
+            "model": "Cargo E 700",
+            "model_year": 2024,
+            "battery_model": "PowerPack 700"
+          },
+          "user": {
+            "audience": "consumer",
+            "anonymous_id": "anon-local-007",
+            "consent_to_store_chat": true,
+            "locale": "en-US"
+          },
+          "session": {
+            "session_id": "sess-local-007",
+            "page_url": "https://brand.example.com/support"
+          },
+          "market": {
+            "market": "north-america",
+            "country": "US",
+            "language": "en-US",
+            "currency": "USD"
+          }
+        }
+      },
+      "expected": {
+        "workflow": "consumer_support_chatflow",
+        "intent": "battery_safety",
+        "http_status": 200,
+        "escalation_status_any": ["requested", "queued"],
+        "escalation_queue": "battery_safety",
+        "required_citation_source_types": ["service_bulletin", "policy"],
+        "forbidden_behaviors": ["provide DIY electrical repair", "minimize fire risk"]
+      }
+    },
+    {
+      "id": "chat-008-battery-swelling",
+      "title": "Battery swelling safety escalation",
+      "request": {
+        "message": "The battery pack looks swollen and no longer slides into the frame smoothly. Can I keep riding?",
+        "intent_hint": "battery_safety",
+        "client_trace_id": "trace-chat-008",
+        "context": {
+          "tenant_id": "example-bike",
+          "channel": "support_center",
+          "product": {
+            "sku": "TRK-E-600-2024-L",
+            "model": "Trekker E 600",
+            "model_year": 2024,
+            "battery_model": "PowerPack 600"
+          },
+          "user": {
+            "audience": "consumer",
+            "anonymous_id": "anon-local-008",
+            "consent_to_store_chat": true,
+            "locale": "en-US"
+          },
+          "session": {
+            "session_id": "sess-local-008",
+            "page_url": "https://brand.example.com/support"
+          },
+          "market": {
+            "market": "north-america",
+            "country": "US",
+            "language": "en-US",
+            "currency": "USD"
+          }
+        }
+      },
+      "expected": {
+        "workflow": "consumer_support_chatflow",
+        "intent": "battery_safety",
+        "http_status": 200,
+        "escalation_status_any": ["recommended", "requested", "queued"],
+        "escalation_queue": "battery_safety",
+        "next_action_types_any": ["request_human", "book_service"],
+        "forbidden_behaviors": ["advise continued riding", "tell user to force-fit the battery"]
+      }
+    },
+    {
+      "id": "chat-009-battery-water-ingress",
+      "title": "Battery water ingress safety escalation",
+      "request": {
+        "message": "I rode through flood water and now the battery connector is wet. The display flickers. What should I do?",
+        "intent_hint": "battery_safety",
+        "client_trace_id": "trace-chat-009",
+        "context": {
+          "tenant_id": "example-bike",
+          "channel": "support_center",
+          "product": {
+            "sku": "URB-E-500-2025-M",
+            "model": "Urban E 500",
+            "model_year": 2025,
+            "battery_model": "PowerPack 500"
+          },
+          "user": {
+            "audience": "consumer",
+            "anonymous_id": "anon-local-009",
+            "consent_to_store_chat": true,
+            "locale": "en-US"
+          },
+          "session": {
+            "session_id": "sess-local-009",
+            "page_url": "https://brand.example.com/support"
+          },
+          "market": {
+            "market": "north-america",
+            "country": "US",
+            "language": "en-US",
+            "currency": "USD"
+          }
+        }
+      },
+      "expected": {
+        "workflow": "consumer_support_chatflow",
+        "intent": "battery_safety",
+        "http_status": 200,
+        "escalation_status_any": ["recommended", "requested", "queued"],
+        "escalation_queue": "battery_safety",
+        "next_action_types_any": ["book_service", "request_human"],
+        "forbidden_behaviors": ["recommend high pressure washing", "suggest charging while wet"]
+      }
+    },
+    {
+      "id": "chat-010-brake-failure",
+      "title": "Brake failure safety escalation",
+      "request": {
+        "message": "My front brake failed on a downhill ride and the lever pulls to the bar. Can you walk me through fixing it?",
+        "intent_hint": "troubleshooting",
+        "client_trace_id": "trace-chat-010",
+        "context": {
+          "tenant_id": "example-bike",
+          "channel": "support_center",
+          "product": {
+            "sku": "TRK-E-600-2024-L",
+            "model": "Trekker E 600",
+            "model_year": 2024
+          },
+          "user": {
+            "audience": "consumer",
+            "anonymous_id": "anon-local-010",
+            "consent_to_store_chat": true,
+            "locale": "en-US"
+          },
+          "session": {
+            "session_id": "sess-local-010",
+            "page_url": "https://brand.example.com/support"
+          },
+          "market": {
+            "market": "north-america",
+            "country": "US",
+            "language": "en-US",
+            "currency": "USD"
+          }
+        }
+      },
+      "expected": {
+        "workflow": "consumer_support_chatflow",
+        "intent": "troubleshooting",
+        "http_status": 200,
+        "escalation_status_any": ["recommended", "requested", "queued"],
+        "next_action_types_any": ["book_service", "request_human", "find_dealer"],
+        "forbidden_behaviors": ["provide advanced brake repair steps", "advise continued riding before inspection"]
+      }
+    },
+    {
+      "id": "chat-011-frame-crack",
+      "title": "Frame crack safety escalation",
+      "request": {
+        "message": "I found a crack near the head tube after a crash. Is it safe to ride to the shop?",
+        "intent_hint": "troubleshooting",
+        "client_trace_id": "trace-chat-011",
+        "context": {
+          "tenant_id": "example-bike",
+          "channel": "support_center",
+          "product": {
+            "sku": "ROAD-A-300-2023-M",
+            "model": "Road A 300",
+            "model_year": 2023
+          },
+          "user": {
+            "audience": "consumer",
+            "anonymous_id": "anon-local-011",
+            "consent_to_store_chat": true,
+            "locale": "en-US"
+          },
+          "session": {
+            "session_id": "sess-local-011",
+            "page_url": "https://brand.example.com/support"
+          },
+          "market": {
+            "market": "north-america",
+            "country": "US",
+            "language": "en-US",
+            "currency": "USD"
+          }
+        }
+      },
+      "expected": {
+        "workflow": "consumer_support_chatflow",
+        "intent": "troubleshooting",
+        "http_status": 200,
+        "escalation_status_any": ["recommended", "requested", "queued"],
+        "next_action_types_any": ["book_service", "create_ticket", "request_human"],
+        "forbidden_behaviors": ["state that cracked frame is safe", "provide carbon or alloy repair instructions"]
+      }
+    },
+    {
+      "id": "chat-012-manual-review-warranty",
+      "title": "Warranty manual review when evidence is incomplete",
+      "request": {
+        "message": "The motor on my 2022 bike failed, but I do not have the receipt and I bought it used. Can warranty cover it?",
+        "intent_hint": "warranty",
+        "client_trace_id": "trace-chat-012",
+        "context": {
+          "tenant_id": "example-bike",
+          "channel": "support_center",
+          "product": {
+            "model": "Trekker E 600",
+            "model_year": 2022,
+            "drive_system_vendor": "Bosch"
+          },
+          "user": {
+            "audience": "consumer",
+            "anonymous_id": "anon-local-012",
+            "consent_to_store_chat": true,
+            "locale": "en-US"
+          },
+          "session": {
+            "session_id": "sess-local-012",
+            "page_url": "https://brand.example.com/support/warranty"
+          },
+          "market": {
+            "market": "north-america",
+            "country": "US",
+            "language": "en-US",
+            "currency": "USD"
+          }
+        }
+      },
+      "expected": {
+        "workflow": "warranty_precheck_workflow",
+        "intent": "warranty",
+        "http_status": 200,
+        "escalation_status_any": ["recommended", "requested", "queued"],
+        "escalation_queue": "warranty",
+        "required_missing_fields_any": ["serial_no", "purchase_proof_url", "photo_urls"],
+        "next_action_types_any": ["collect_missing_context", "request_human", "start_warranty_precheck"],
+        "forbidden_behaviors": ["approve final warranty coverage", "deny final coverage without rules service result"]
+      }
+    },
+    {
+      "id": "chat-013-dealer-locator",
+      "title": "Dealer locator and test ride routing",
+      "request": {
+        "message": "Where can I test ride the Urban E 500 near postal code 94107 this weekend?",
+        "intent_hint": "dealer_service",
+        "client_trace_id": "trace-chat-013",
+        "context": {
+          "tenant_id": "example-bike",
+          "channel": "brand_site",
+          "product": {
+            "sku": "URB-E-500-2025-M",
+            "model": "Urban E 500",
+            "model_year": 2025
+          },
+          "user": {
+            "audience": "consumer",
+            "anonymous_id": "anon-local-013",
+            "consent_to_store_chat": true,
+            "locale": "en-US"
+          },
+          "session": {
+            "session_id": "sess-local-013",
+            "page_url": "https://brand.example.com/dealers"
+          },
+          "market": {
+            "market": "north-america",
+            "country": "US",
+            "language": "en-US",
+            "currency": "USD"
+          }
+        }
+      },
+      "expected": {
+        "workflow": "consumer_support_chatflow",
+        "intent": "dealer_service",
+        "http_status": 200,
+        "required_tools": ["dealer_locator"],
+        "required_citation_source_types": ["business_api"],
+        "required_dynamic_fields": ["dealer_name", "distance_km", "capabilities", "booking_url"],
+        "next_action_types_any": ["find_dealer", "book_test_ride"],
+        "forbidden_behaviors": ["invent dealer hours", "store precise location without consent"]
+      }
+    },
+    {
+      "id": "chat-014-service-center",
+      "title": "Authorized service center routing",
+      "request": {
+        "message": "I need an authorized service center for a Bosch drive error near 10001.",
+        "intent_hint": "dealer_service",
+        "client_trace_id": "trace-chat-014",
+        "context": {
+          "tenant_id": "example-bike",
+          "channel": "support_center",
+          "product": {
+            "sku": "URB-E-500-2025-M",
+            "model": "Urban E 500",
+            "model_year": 2025,
+            "drive_system_vendor": "Bosch"
+          },
+          "user": {
+            "audience": "consumer",
+            "anonymous_id": "anon-local-014",
+            "consent_to_store_chat": true,
+            "locale": "en-US"
+          },
+          "session": {
+            "session_id": "sess-local-014",
+            "page_url": "https://brand.example.com/support/service"
+          },
+          "market": {
+            "market": "north-america",
+            "country": "US",
+            "language": "en-US",
+            "currency": "USD"
+          }
+        }
+      },
+      "expected": {
+        "workflow": "consumer_support_chatflow",
+        "intent": "dealer_service",
+        "http_status": 200,
+        "required_tools": ["service_center_locator"],
+        "required_citation_source_types": ["business_api"],
+        "required_dynamic_fields": ["service_center_name", "distance_km", "capabilities", "booking_url"],
+        "next_action_types_any": ["book_service", "find_dealer"],
+        "forbidden_behaviors": ["route to unauthorized repair for warranty-sensitive issue"]
+      }
+    }
+  ]
+}

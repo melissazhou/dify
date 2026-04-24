@@ -1,0 +1,515 @@
+openapi: 3.1.0
+info:
+  title: Bike Assistant BFF Contract
+  version: 0.1.0
+  description: >
+    Browser-facing contract for an embeddable bicycle brand assistant. The BFF
+    authenticates the storefront session, injects trusted context, calls Dify
+    from the server side, and returns structured citations, actions, feedback,
+    and human-escalation state.
+servers:
+  - url: https://brand.example.com
+    description: Brand storefront or app origin
+paths:
+  /api/bike-assistant/chat:
+    post:
+      summary: Send a customer message to the assistant through the BFF
+      operationId: createBikeAssistantChatTurn
+      parameters:
+        - $ref: '#/components/parameters/tenantHeader'
+        - $ref: '#/components/parameters/sessionHeader'
+        - $ref: '#/components/parameters/clientTraceHeader'
+        - $ref: '#/components/parameters/acceptLanguageHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BikeAssistantChatRequest'
+            examples:
+              productPageQuestion:
+                value:
+                  message: Can this bike fit a rear child seat?
+                  intent_hint: accessory_compatibility
+                  client_trace_id: 018f95ff-2f56-7687-b7c1-6f88cf8b5f9d
+                  context:
+                    tenant_id: example-bike
+                    channel: product_detail_page
+                    product:
+                      sku: URB-E-500-2025-M
+                      model: Urban E 500
+                      model_year: 2025
+                      product_url: https://brand.example.com/products/urb-e-500
+                      battery_model: PowerPack 500
+                      drive_system_vendor: Bosch
+                    user:
+                      audience: consumer
+                      anonymous_id: anon_123
+                      consent_to_store_chat: true
+                      locale: en-US
+                    session:
+                      session_id: sess_123
+                      page_url: https://brand.example.com/products/urb-e-500
+                      referrer: https://brand.example.com/e-bikes
+                    market:
+                      market: north-america
+                      country: US
+                      language: en-US
+                      currency: USD
+      responses:
+        '200':
+          description: Assistant answer with structured production UI state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BikeAssistantChatResponse'
+        '400':
+          $ref: '#/components/responses/validationError'
+        '401':
+          $ref: '#/components/responses/unauthenticated'
+        '403':
+          $ref: '#/components/responses/forbidden'
+        '429':
+          $ref: '#/components/responses/rateLimited'
+        '502':
+          $ref: '#/components/responses/upstreamUnavailable'
+        '504':
+          $ref: '#/components/responses/upstreamTimeout'
+  /api/bike-assistant/feedback:
+    post:
+      summary: Record user feedback for a returned assistant message
+      operationId: createBikeAssistantFeedback
+      parameters:
+        - $ref: '#/components/parameters/clientTraceHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BikeAssistantFeedbackRequest'
+      responses:
+        '204':
+          description: Feedback accepted
+        '400':
+          $ref: '#/components/responses/validationError'
+        '429':
+          $ref: '#/components/responses/rateLimited'
+components:
+  parameters:
+    tenantHeader:
+      name: X-Bike-Brand-Tenant
+      in: header
+      required: true
+      schema:
+        type: string
+      description: Brand or tenant slug resolved by the BFF.
+    sessionHeader:
+      name: X-Bike-Brand-Session
+      in: header
+      required: true
+      schema:
+        type: string
+      description: Browser session identifier used for rate limits and continuity.
+    clientTraceHeader:
+      name: X-Client-Trace-Id
+      in: header
+      required: true
+      schema:
+        type: string
+      description: Client-generated request correlation id.
+    acceptLanguageHeader:
+      name: Accept-Language
+      in: header
+      required: false
+      schema:
+        type: string
+      description: Browser language preference; body context remains authoritative.
+  responses:
+    validationError:
+      description: Missing or invalid request context
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BikeAssistantErrorResponse'
+          examples:
+            missingSku:
+              value:
+                error:
+                  code: validation_error
+                  message: Product SKU is required for compatibility questions.
+                  retryable: false
+                  missing_fields:
+                    - context.product.sku
+                server_trace_id: srv_001
+    unauthenticated:
+      description: Storefront session is not authenticated when authentication is required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BikeAssistantErrorResponse'
+    forbidden:
+      description: Caller is not allowed to use the requested audience, market, or tenant
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BikeAssistantErrorResponse'
+    rateLimited:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BikeAssistantErrorResponse'
+    upstreamUnavailable:
+      description: Dify or a business integration is unavailable
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BikeAssistantErrorResponse'
+    upstreamTimeout:
+      description: Dify or a business integration timed out
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BikeAssistantErrorResponse'
+  schemas:
+    BikeAssistantChatRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - message
+        - context
+        - client_trace_id
+      properties:
+        message:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        intent_hint:
+          $ref: '#/components/schemas/BikeAssistantIntent'
+        context:
+          $ref: '#/components/schemas/BikeAssistantRequestContext'
+        client_trace_id:
+          type: string
+    BikeAssistantRequestContext:
+      type: object
+      additionalProperties: false
+      required:
+        - tenant_id
+        - channel
+        - user
+        - session
+        - market
+      properties:
+        tenant_id:
+          type: string
+        channel:
+          enum:
+            - brand_site
+            - product_detail_page
+            - dealer_portal
+            - support_center
+        product:
+          $ref: '#/components/schemas/BikeAssistantProductContext'
+        user:
+          $ref: '#/components/schemas/BikeAssistantUserContext'
+        session:
+          $ref: '#/components/schemas/BikeAssistantSessionContext'
+        market:
+          $ref: '#/components/schemas/BikeAssistantMarketContext'
+    BikeAssistantProductContext:
+      type: object
+      additionalProperties: false
+      properties:
+        sku:
+          type: string
+        model:
+          type: string
+        model_year:
+          type: integer
+        product_url:
+          type: string
+          format: uri
+        battery_model:
+          type: string
+        drive_system_vendor:
+          type: string
+    BikeAssistantUserContext:
+      type: object
+      additionalProperties: false
+      required:
+        - audience
+        - consent_to_store_chat
+      properties:
+        user_id:
+          type: string
+        anonymous_id:
+          type: string
+        audience:
+          enum:
+            - consumer
+            - dealer
+            - internal_agent
+        consent_to_store_chat:
+          type: boolean
+        locale:
+          type: string
+    BikeAssistantSessionContext:
+      type: object
+      additionalProperties: false
+      required:
+        - session_id
+        - page_url
+      properties:
+        session_id:
+          type: string
+        conversation_id:
+          type: string
+        page_url:
+          type: string
+          format: uri
+        referrer:
+          type: string
+          format: uri
+    BikeAssistantMarketContext:
+      type: object
+      additionalProperties: false
+      required:
+        - market
+        - country
+        - language
+      properties:
+        market:
+          type: string
+        country:
+          type: string
+        language:
+          type: string
+        currency:
+          type: string
+    BikeAssistantChatResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - answer
+        - conversation_id
+        - message_id
+        - intent
+        - confidence
+        - citations
+        - next_actions
+        - escalation
+        - feedback
+        - server_trace_id
+      properties:
+        answer:
+          type: string
+        conversation_id:
+          type: string
+        message_id:
+          type: string
+        intent:
+          $ref: '#/components/schemas/BikeAssistantIntent'
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+        citations:
+          type: array
+          items:
+            $ref: '#/components/schemas/BikeAssistantCitation'
+        next_actions:
+          type: array
+          items:
+            $ref: '#/components/schemas/BikeAssistantNextAction'
+        escalation:
+          $ref: '#/components/schemas/BikeAssistantEscalation'
+        feedback:
+          $ref: '#/components/schemas/BikeAssistantFeedback'
+        server_trace_id:
+          type: string
+    BikeAssistantIntent:
+      enum:
+        - pre_sales
+        - product_recommendation
+        - accessory_compatibility
+        - order_status
+        - return_refund
+        - warranty
+        - troubleshooting
+        - battery_safety
+        - dealer_service
+        - human_escalation
+        - other
+    BikeAssistantCitation:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - title
+        - source_type
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        source_type:
+          enum:
+            - knowledge_base
+            - manual
+            - policy
+            - service_bulletin
+            - business_api
+        source_uri:
+          type: string
+          format: uri
+        document_version:
+          type: string
+        market:
+          type: string
+        language:
+          type: string
+        snippet:
+          type: string
+    BikeAssistantNextAction:
+      type: object
+      additionalProperties: false
+      required:
+        - type
+        - label
+        - requires_confirmation
+      properties:
+        type:
+          enum:
+            - book_test_ride
+            - book_service
+            - create_ticket
+            - start_warranty_precheck
+            - find_dealer
+            - request_human
+            - open_product
+            - collect_missing_context
+        label:
+          type: string
+        href:
+          type: string
+          format: uri-reference
+        payload:
+          type: object
+          additionalProperties:
+            oneOf:
+              - type: string
+              - type: number
+              - type: boolean
+        requires_confirmation:
+          type: boolean
+    BikeAssistantEscalation:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+      properties:
+        status:
+          enum:
+            - not_needed
+            - recommended
+            - requested
+            - queued
+            - accepted
+            - failed
+        reason:
+          type: string
+        ticket_id:
+          type: string
+        queue:
+          enum:
+            - customer_support
+            - warranty
+            - battery_safety
+            - dealer_support
+        eta_minutes:
+          type: integer
+        required_fields:
+          type: array
+          items:
+            type: string
+    BikeAssistantFeedback:
+      type: object
+      additionalProperties: false
+      required:
+        - enabled
+        - endpoint
+        - message_id
+      properties:
+        enabled:
+          type: boolean
+        endpoint:
+          const: /api/bike-assistant/feedback
+        message_id:
+          type: string
+    BikeAssistantFeedbackRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - message_id
+        - conversation_id
+        - rating
+        - client_trace_id
+      properties:
+        message_id:
+          type: string
+        conversation_id:
+          type: string
+        rating:
+          enum:
+            - up
+            - down
+        reason:
+          enum:
+            - incorrect
+            - unsafe
+            - missing_context
+            - not_helpful
+            - other
+        comment:
+          type: string
+          maxLength: 1000
+        client_trace_id:
+          type: string
+    BikeAssistantErrorResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - error
+        - server_trace_id
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required:
+            - code
+            - message
+            - retryable
+          properties:
+            code:
+              enum:
+                - validation_error
+                - unauthenticated
+                - forbidden
+                - rate_limited
+                - dify_unavailable
+                - business_system_unavailable
+                - upstream_timeout
+                - safety_escalation_required
+                - unknown_error
+            message:
+              type: string
+            retryable:
+              type: boolean
+            escalation:
+              $ref: '#/components/schemas/BikeAssistantEscalation'
+            missing_fields:
+              type: array
+              items:
+                type: string
+        server_trace_id:
+          type: string

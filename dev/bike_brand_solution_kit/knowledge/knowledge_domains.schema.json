@@ -1,0 +1,262 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dify.local/schemas/bike-brand/knowledge_domains.schema.json",
+  "title": "Bike Brand Knowledge Domains",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "version",
+    "last_updated",
+    "domains"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "last_updated": {
+      "type": "string",
+      "format": "date"
+    },
+    "domains": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "consumer_support",
+        "product_catalog",
+        "manuals_and_service",
+        "warranty_policy",
+        "dealer_internal",
+        "safety_and_recall"
+      ],
+      "properties": {
+        "consumer_support": {
+          "$ref": "#/$defs/domain"
+        },
+        "product_catalog": {
+          "$ref": "#/$defs/domain"
+        },
+        "manuals_and_service": {
+          "$ref": "#/$defs/domain"
+        },
+        "warranty_policy": {
+          "$ref": "#/$defs/domain"
+        },
+        "dealer_internal": {
+          "$ref": "#/$defs/domain"
+        },
+        "safety_and_recall": {
+          "$ref": "#/$defs/domain"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "domain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "domain_id",
+        "display_name",
+        "purpose",
+        "allowed_audiences",
+        "allowed_document_types",
+        "required_metadata",
+        "recommended_chunking_strategy",
+        "retrieval_strategy",
+        "prohibited_mixing_rules",
+        "annotation_policy"
+      ],
+      "properties": {
+        "domain_id": {
+          "type": "string",
+          "enum": [
+            "consumer_support",
+            "product_catalog",
+            "manuals_and_service",
+            "warranty_policy",
+            "dealer_internal",
+            "safety_and_recall"
+          ]
+        },
+        "display_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "purpose": {
+          "type": "string",
+          "minLength": 1
+        },
+        "allowed_audiences": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "consumer",
+              "dealer",
+              "internal",
+              "support_agent",
+              "sales",
+              "service",
+              "legal",
+              "safety_quality"
+            ]
+          }
+        },
+        "allowed_document_types": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "required_metadata": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "recommended_chunking_strategy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mode",
+            "target_tokens",
+            "overlap_tokens",
+            "boundary_rules",
+            "indexing"
+          ],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "qa_pairs",
+                "short_blocks",
+                "parent_child",
+                "section_hierarchy",
+                "structured_records"
+              ]
+            },
+            "target_tokens": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "min",
+                "max"
+              ],
+              "properties": {
+                "min": {
+                  "type": "integer",
+                  "minimum": 50
+                },
+                "max": {
+                  "type": "integer",
+                  "minimum": 100
+                }
+              }
+            },
+            "overlap_tokens": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 300
+            },
+            "boundary_rules": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string"
+              }
+            },
+            "indexing": {
+              "type": "string",
+              "enum": [
+                "high_quality",
+                "high_quality_with_parent_child",
+                "structured_external_plus_rag"
+              ]
+            }
+          }
+        },
+        "retrieval_strategy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "metadata_filters",
+            "top_k",
+            "rerank",
+            "minimum_score",
+            "fallback"
+          ],
+          "properties": {
+            "metadata_filters": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "string"
+              }
+            },
+            "top_k": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20
+            },
+            "rerank": {
+              "type": "boolean"
+            },
+            "minimum_score": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "fallback": {
+              "type": "string",
+              "enum": [
+                "ask_clarifying_question",
+                "route_to_human",
+                "annotation_first",
+                "external_rule_service"
+              ]
+            }
+          }
+        },
+        "prohibited_mixing_rules": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "annotation_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "required",
+            "required_for"
+          ],
+          "properties": {
+            "required": {
+              "type": "boolean"
+            },
+            "required_for": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

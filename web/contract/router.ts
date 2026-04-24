@@ -1,6 +1,12 @@
 import type { InferContractRouterInputs } from '@orpc/contract'
 import { accountAvatarContract } from './console/account'
 import { appDeleteContract, workflowOnlineUsersContract } from './console/apps'
+import {
+  bikeBrandAssetsContract,
+  bikeBrandChatContract,
+  bikeBrandFeedbackContract,
+  bikeBrandSummaryContract,
+} from './console/bike-brand'
 import { bindPartnerStackContract, invoicesContract } from './console/billing'
 import {
   exploreAppDetailContract,
@@ -89,6 +95,12 @@ export const consoleRouterContract = {
   billing: {
     invoices: invoicesContract,
     bindPartnerStack: bindPartnerStackContract,
+  },
+  bikeBrand: {
+    summary: bikeBrandSummaryContract,
+    assets: bikeBrandAssetsContract,
+    chat: bikeBrandChatContract,
+    feedback: bikeBrandFeedbackContract,
   },
   workflowDraft: {
     environmentVariables: workflowDraftEnvironmentVariablesContract,

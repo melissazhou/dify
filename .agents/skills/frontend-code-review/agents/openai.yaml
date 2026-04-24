@@ -1,0 +1,4 @@
+interface:
+  display_name: "Frontend Code Review"
+  short_description: "Review Dify frontend TypeScript changes"
+  default_prompt: "Use $frontend-code-review to review Dify frontend TypeScript or React changes."

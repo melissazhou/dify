@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dify.local/schemas/bike-brand/annotation_guardrails.schema.json",
+  "title": "Bike Brand Annotation Guardrails",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "version",
+    "last_updated",
+    "annotation_first_categories",
+    "fallback_answer_contract"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "last_updated": {
+      "type": "string",
+      "format": "date"
+    },
+    "annotation_first_categories": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "category_id",
+          "risk_level",
+          "match_signals",
+          "required_metadata_filters",
+          "required_actions",
+          "blocked_actions"
+        ],
+        "properties": {
+          "category_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{2,63}$"
+          },
+          "risk_level": {
+            "type": "string",
+            "enum": [
+              "high",
+              "critical"
+            ]
+          },
+          "match_signals": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required_metadata_filters": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "required_actions": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "enum": [
+                "use_annotation_first",
+                "cite_official_source",
+                "collect_model_year",
+                "collect_serial_number",
+                "collect_country_market",
+                "collect_photos_or_video",
+                "route_to_authorized_service",
+                "route_to_human",
+                "call_external_rules_service",
+                "state_no_final_eligibility_decision"
+              ]
+            }
+          },
+          "blocked_actions": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "enum": [
+                "freeform_safety_advice",
+                "diy_battery_repair",
+                "diy_brake_failure_repair",
+                "ride_with_known_safety_fault",
+                "final_warranty_approval",
+                "final_recall_hit_decision_from_rag",
+                "ignore_expired_policy"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "fallback_answer_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sections",
+        "must_include",
+        "must_not_include"
+      ],
+      "properties": {
+        "sections": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "must_include": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "must_not_include": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

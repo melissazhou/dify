@@ -1,0 +1,217 @@
+{
+  "$schema": "./annotation_guardrails.schema.json",
+  "version": "1.0.0",
+  "last_updated": "2026-04-24",
+  "annotation_first_categories": [
+    {
+      "category_id": "battery_fire_smoke_odor",
+      "risk_level": "critical",
+      "match_signals": [
+        "battery smoke",
+        "battery fire",
+        "burning smell",
+        "smoke",
+        "fire",
+        "odor",
+        "冒烟",
+        "起火",
+        "烧焦味",
+        "异味"
+      ],
+      "required_metadata_filters": [
+        "knowledge_domain=safety_and_recall",
+        "safety_related=true",
+        "legal_approved=true",
+        "status=published",
+        "language",
+        "country",
+        "market"
+      ],
+      "required_actions": [
+        "use_annotation_first",
+        "cite_official_source",
+        "collect_model_year",
+        "collect_serial_number",
+        "collect_country_market",
+        "route_to_authorized_service",
+        "route_to_human"
+      ],
+      "blocked_actions": [
+        "freeform_safety_advice",
+        "diy_battery_repair",
+        "ride_with_known_safety_fault",
+        "final_recall_hit_decision_from_rag"
+      ]
+    },
+    {
+      "category_id": "battery_swelling_water_short",
+      "risk_level": "critical",
+      "match_signals": [
+        "battery swelling",
+        "swollen battery",
+        "water ingress",
+        "short circuit",
+        "won't charge after rain",
+        "电池鼓包",
+        "电池进水",
+        "短路",
+        "雨淋后无法充电"
+      ],
+      "required_metadata_filters": [
+        "knowledge_domain=safety_and_recall",
+        "safety_related=true",
+        "legal_approved=true",
+        "status=published",
+        "battery_model",
+        "language",
+        "country",
+        "market"
+      ],
+      "required_actions": [
+        "use_annotation_first",
+        "cite_official_source",
+        "collect_model_year",
+        "collect_serial_number",
+        "collect_photos_or_video",
+        "route_to_authorized_service",
+        "route_to_human"
+      ],
+      "blocked_actions": [
+        "freeform_safety_advice",
+        "diy_battery_repair",
+        "ride_with_known_safety_fault"
+      ]
+    },
+    {
+      "category_id": "brake_or_frame_safety",
+      "risk_level": "critical",
+      "match_signals": [
+        "brake failure",
+        "brakes stopped working",
+        "frame crack",
+        "fork crack",
+        "制动失效",
+        "刹车失灵",
+        "车架裂纹",
+        "前叉裂纹"
+      ],
+      "required_metadata_filters": [
+        "knowledge_domain=safety_and_recall",
+        "safety_related=true",
+        "legal_approved=true",
+        "status=published",
+        "model",
+        "model_year",
+        "language",
+        "country",
+        "market"
+      ],
+      "required_actions": [
+        "use_annotation_first",
+        "cite_official_source",
+        "collect_model_year",
+        "collect_serial_number",
+        "collect_photos_or_video",
+        "route_to_authorized_service",
+        "route_to_human"
+      ],
+      "blocked_actions": [
+        "freeform_safety_advice",
+        "diy_brake_failure_repair",
+        "ride_with_known_safety_fault"
+      ]
+    },
+    {
+      "category_id": "recall_notice_lookup",
+      "risk_level": "critical",
+      "match_signals": [
+        "recall",
+        "recall notice",
+        "serial number recall",
+        "affected batch",
+        "召回",
+        "召回公告",
+        "序列号是否召回",
+        "受影响批次"
+      ],
+      "required_metadata_filters": [
+        "knowledge_domain=safety_and_recall",
+        "document_type=recall_notice",
+        "safety_related=true",
+        "legal_approved=true",
+        "status=published",
+        "language",
+        "country",
+        "market"
+      ],
+      "required_actions": [
+        "use_annotation_first",
+        "cite_official_source",
+        "collect_serial_number",
+        "collect_country_market",
+        "call_external_rules_service",
+        "route_to_human"
+      ],
+      "blocked_actions": [
+        "freeform_safety_advice",
+        "final_recall_hit_decision_from_rag"
+      ]
+    },
+    {
+      "category_id": "warranty_policy_decision",
+      "risk_level": "high",
+      "match_signals": [
+        "is this covered by warranty",
+        "warranty period",
+        "proof of purchase",
+        "third-party component warranty",
+        "能不能保修",
+        "保修期",
+        "购买凭证",
+        "第三方部件保修"
+      ],
+      "required_metadata_filters": [
+        "knowledge_domain=warranty_policy",
+        "legal_approved=true",
+        "status=published",
+        "policy_type=warranty",
+        "warranty_region",
+        "language",
+        "country",
+        "market"
+      ],
+      "required_actions": [
+        "use_annotation_first",
+        "cite_official_source",
+        "collect_model_year",
+        "collect_serial_number",
+        "collect_photos_or_video",
+        "call_external_rules_service",
+        "state_no_final_eligibility_decision"
+      ],
+      "blocked_actions": [
+        "final_warranty_approval",
+        "ignore_expired_policy"
+      ]
+    }
+  ],
+  "fallback_answer_contract": {
+    "sections": [
+      "conclusion",
+      "basis_with_citation",
+      "next_step",
+      "required_user_information",
+      "human_or_authorized_service_escalation"
+    ],
+    "must_include": [
+      "Use only legally approved published annotations for matched high-risk categories.",
+      "Ask for missing model year, serial number, country/market, photos, or video when needed.",
+      "State that final warranty approval, recall hit/miss, and safety inspection decisions require the rules service, an authorized service provider, or human/manual review."
+    ],
+    "must_not_include": [
+      "Do not improvise repair steps for damaged batteries, brake failure, or frame cracks.",
+      "Do not advise riding when a known safety fault is present.",
+      "Do not claim final warranty approval or recall status from RAG text alone."
+    ]
+  }
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Frontend Testing"
+  short_description: "Write Dify Vitest and RTL tests"
+  default_prompt: "Use $frontend-testing to write or review Dify frontend Vitest and React Testing Library tests."

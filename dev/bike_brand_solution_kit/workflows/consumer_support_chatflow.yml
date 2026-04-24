@@ -1,0 +1,661 @@
+app:
+  description: P0 consumer support chatflow for bicycle and e-bike brand support.
+  icon: support
+  icon_background: '#E0F2FE'
+  mode: advanced-chat
+  name: consumer_support_chatflow
+  use_icon_as_answer_icon: false
+dependencies: []
+kind: app
+version: 0.3.1
+workflow:
+  conversation_variables:
+  - name: last_intent
+    value_type: string
+    value: ''
+  - name: handoff_required
+    value_type: boolean
+    value: false
+  environment_variables:
+  - name: BIKE_BRAND_BUSINESS_API_BASE_URL
+    value: https://business-api.example.com
+  - name: BIKE_BRAND_TICKET_API_BASE_URL
+    value: https://ticket-api.example.com
+  - name: BIKE_BRAND_FEEDBACK_API_BASE_URL
+    value: https://feedback-api.example.com
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: ''
+    retriever_resource:
+      enabled: true
+    sensitive_word_avoidance:
+      enabled: true
+    speech_to_text:
+      enabled: false
+    suggested_questions:
+    - Which bike fits a daily commute?
+    - Can you help check my order or warranty options?
+    suggested_questions_after_answer:
+      enabled: true
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: question-classifier
+      id: start-to-intent-classifier
+      source: start
+      sourceHandle: source
+      target: intent_classifier
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: question-classifier
+        targetType: answer
+      id: classifier-to-safety-answer
+      source: intent_classifier
+      sourceHandle: battery_safety
+      target: safety_answer
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: question-classifier
+        targetType: parameter-extractor
+      id: classifier-to-extractor
+      source: intent_classifier
+      sourceHandle: normal_support
+      target: context_extractor
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: parameter-extractor
+        targetType: knowledge-retrieval
+      id: extractor-to-filtered-retrieval
+      source: context_extractor
+      sourceHandle: source
+      target: metadata_filtered_retrieval
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: knowledge-retrieval
+        targetType: http-request
+      id: retrieval-to-business-tools
+      source: metadata_filtered_retrieval
+      sourceHandle: source
+      target: business_tool_lookup
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: http-request
+        targetType: llm
+      id: business-tools-to-answer-draft
+      source: business_tool_lookup
+      sourceHandle: source
+      target: grounded_answer_llm
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: if-else
+      id: answer-draft-to-confidence-gate
+      source: grounded_answer_llm
+      sourceHandle: source
+      target: low_confidence_gate
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: if-else
+        targetType: human-input
+      id: low-confidence-to-human-input
+      source: low_confidence_gate
+      sourceHandle: low_confidence
+      target: human_handoff
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: if-else
+        targetType: answer
+      id: confident-to-final-answer
+      source: low_confidence_gate
+      sourceHandle: false
+      target: final_answer
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: human-input
+        targetType: answer
+      id: human-input-to-handoff-answer
+      source: human_handoff
+      sourceHandle: source
+      target: handoff_answer
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        desc: Consumer entrypoint. BFF should inject trusted tenant, market, language, and audience context.
+        selected: false
+        title: Start
+        type: start
+        variables:
+        - label: query
+          max_length: 4000
+          options: []
+          required: true
+          type: paragraph
+          variable: query
+        - label: brand
+          max_length: 80
+          options: []
+          required: true
+          type: text-input
+          variable: brand
+        - label: market
+          max_length: 80
+          options: []
+          required: true
+          type: text-input
+          variable: market
+        - label: language
+          max_length: 20
+          options: []
+          required: true
+          type: text-input
+          variable: language
+        - label: audience
+          max_length: 40
+          options:
+          - consumer
+          required: true
+          type: select
+          variable: audience
+        - label: model
+          max_length: 120
+          options: []
+          required: false
+          type: text-input
+          variable: model
+        - label: model_year
+          max_length: 4
+          options: []
+          required: false
+          type: text-input
+          variable: model_year
+        - label: order_no
+          max_length: 80
+          options: []
+          required: false
+          type: text-input
+          variable: order_no
+        - label: serial_no
+          max_length: 80
+          options: []
+          required: false
+          type: text-input
+          variable: serial_no
+        - label: customer_id
+          max_length: 120
+          options: []
+          required: false
+          type: text-input
+          variable: customer_id
+      height: 220
+      id: start
+      position:
+        x: 30
+        y: 260
+      positionAbsolute:
+        x: 30
+        y: 260
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        classes:
+        - id: battery_safety
+          name: battery_safety
+          description: Battery swelling, smoke, odor, fire, crash damage, brake failure, frame crack, charger short, water ingress, or other safety risk.
+        - id: product_presales
+          name: product_presales
+          description: Product information, comparisons, sizing, range, accessories, test ride, or dealer lookup.
+        - id: warranty_after_sales
+          name: warranty_after_sales
+          description: Warranty, repair, troubleshooting, serial number, proof of purchase, return, or service ticket.
+        - id: order_returns
+          name: order_returns
+          description: Order status, shipping, logistics, returns, refunds, or payment questions.
+        - id: compatibility
+          name: compatibility
+          description: Accessory, spare part, battery, display, controller, or component compatibility.
+        - id: other
+          name: other
+          description: Any supported consumer question not covered above.
+        desc: Route high-risk safety away from free-form answers. Other intents share normal_support output for P0.
+        instruction: Classify the current user query into exactly one class. If any safety risk term is present, choose battery_safety.
+        model:
+          completion_params:
+            temperature: 0
+          mode: chat
+          name: ''
+          provider: ''
+        query_variable_selector:
+        - start
+        - query
+        selected: false
+        title: Intent Classifier
+        type: question-classifier
+      height: 170
+      id: intent_classifier
+      position:
+        x: 334
+        y: 260
+      positionAbsolute:
+        x: 334
+        y: 260
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        answer: "I cannot safely troubleshoot this issue in chat. Stop using and charging the bike or battery, keep it away from flammable materials if safe to do so, and contact an authorized service provider or emergency services if there is smoke, fire, strong odor, heat, crash damage, brake failure, or frame cracking. I will route this to a human support queue with the safety reason and available context."
+        desc: Fixed safety response for battery/fire/brake/frame risks.
+        selected: false
+        title: Safety Guardrail Answer
+        type: answer
+        variables: []
+      height: 150
+      id: safety_answer
+      position:
+        x: 638
+        y: 70
+      positionAbsolute:
+        x: 638
+        y: 70
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: Extract routing metadata and business identifiers from the user query.
+        instruction: Extract model, model_year, order_no, serial_no, issue_category, policy_type, country, part_number, and risk_level. Do not invent missing values.
+        model:
+          completion_params:
+            temperature: 0
+          mode: chat
+          name: ''
+          provider: ''
+        parameters:
+        - name: model
+          required: false
+          type: string
+        - name: model_year
+          required: false
+          type: string
+        - name: issue_category
+          required: false
+          type: string
+        - name: policy_type
+          required: false
+          type: string
+        - name: part_number
+          required: false
+          type: string
+        - name: risk_level
+          required: true
+          type: string
+        query:
+        - start
+        - query
+        selected: false
+        title: Context Extractor
+        type: parameter-extractor
+      height: 170
+      id: context_extractor
+      position:
+        x: 638
+        y: 260
+      positionAbsolute:
+        x: 638
+        y: 260
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        dataset_ids:
+        - product_models
+        - manuals_maintenance
+        - warranty_policy
+        - dealer_service_network
+        - support_faq
+        desc: Metadata filtered retrieval. Replace dataset ids after import.
+        metadata_filtering_conditions:
+          logical_operator: and
+          conditions:
+          - name: brand
+            comparison_operator: is
+            value: '{{#start.brand#}}'
+          - name: market
+            comparison_operator: is
+            value: '{{#start.market#}}'
+          - name: language
+            comparison_operator: is
+            value: '{{#start.language#}}'
+          - name: audience
+            comparison_operator: is
+            value: consumer
+          - name: status
+            comparison_operator: is
+            value: published
+          - name: legal_approved
+            comparison_operator: is
+            value: true
+          - name: model
+            comparison_operator: is_or_empty
+            value: '{{#context_extractor.model#}}'
+          - name: model_year
+            comparison_operator: is_or_empty
+            value: '{{#context_extractor.model_year#}}'
+        multiple_retrieval_config:
+          reranking_enable: true
+          top_k: 6
+          score_threshold: 0.62
+        query_variable_selector:
+        - start
+        - query
+        selected: false
+        title: Metadata Filtered Knowledge Retrieval
+        type: knowledge-retrieval
+      height: 190
+      id: metadata_filtered_retrieval
+      position:
+        x: 942
+        y: 260
+      positionAbsolute:
+        x: 942
+        y: 260
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        authorization:
+          type: no-auth
+        body:
+          data: |-
+            {
+              "intent": "{{#intent_classifier.class_name#}}",
+              "query": "{{#start.query#}}",
+              "customer_id": "{{#start.customer_id#}}",
+              "order_no": "{{#start.order_no#}}",
+              "serial_no": "{{#start.serial_no#}}",
+              "model": "{{#context_extractor.model#}}",
+              "model_year": "{{#context_extractor.model_year#}}",
+              "market": "{{#start.market#}}",
+              "language": "{{#start.language#}}"
+            }
+          type: json
+        desc: Placeholder for order, dealer, ticket, compatibility, and serial lookup. Dynamic state must come from tools, not the knowledge base.
+        headers: 'Content-Type: application/json'
+        method: POST
+        params: ''
+        retry_config:
+          enabled: false
+          max_retries: 1
+          retry_interval: 1000
+        selected: false
+        timeout:
+          connect: 10
+          read: 30
+          write: 30
+        title: Business Tool Lookup Placeholder
+        type: http-request
+        url: '{{#env.BIKE_BRAND_BUSINESS_API_BASE_URL#}}/support/context'
+      height: 170
+      id: business_tool_lookup
+      position:
+        x: 1246
+        y: 260
+      positionAbsolute:
+        x: 1246
+        y: 260
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        context:
+          enabled: true
+          variable_selector:
+          - metadata_filtered_retrieval
+          - result
+        desc: Compose grounded answer with citations, tool facts, uncertainty, and feedback prompt.
+        memory:
+          query_prompt_template: '{{#sys.query#}}'
+          window:
+            enabled: true
+            size: 6
+        model:
+          completion_params:
+            temperature: 0.2
+          mode: chat
+          name: ''
+          provider: ''
+        prompt_template:
+        - role: system
+          text: |-
+            You are a consumer support assistant for a bicycle/e-bike brand.
+            Answer only from retrieved knowledge and business tool outputs.
+            Cite source titles or document ids from retrieval in every substantive answer.
+            Never claim current price, inventory, order, warranty, recall, or ticket status unless it is present in the business_tool_lookup response.
+            If evidence is insufficient or retrieval confidence is below threshold, set confidence below 0.65 and recommend human handoff.
+            Include a compact "Sources" section and a "Feedback" line asking for thumbs up/down or a short correction.
+            For safety, battery smoke, fire, odor, swelling, brake failure, frame crack, or crash damage, refuse troubleshooting and request human escalation.
+        - role: user
+          text: |-
+            Query: {{#start.query#}}
+            Extracted context: {{#context_extractor.output#}}
+            Retrieved knowledge: {{#metadata_filtered_retrieval.result#}}
+            Business tool context: {{#business_tool_lookup.body#}}
+            Return JSON with keys answer, confidence, citations, next_steps, feedback_prompt, escalation_reason.
+        selected: false
+        title: Grounded Answer LLM
+        type: llm
+        variables: []
+        vision:
+          enabled: false
+      height: 220
+      id: grounded_answer_llm
+      position:
+        x: 1550
+        y: 260
+      positionAbsolute:
+        x: 1550
+        y: 260
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        cases:
+        - case_id: low_confidence
+          conditions:
+          - comparison_operator: '<'
+            id: confidence-below-threshold
+            value: '0.65'
+            varType: number
+            variable_selector:
+            - grounded_answer_llm
+            - confidence
+          id: low_confidence
+          logical_operator: or
+        desc: Route low-confidence or missing-evidence answers to a human queue.
+        selected: false
+        title: Low Confidence Gate
+        type: if-else
+      height: 126
+      id: low_confidence_gate
+      position:
+        x: 1854
+        y: 260
+      positionAbsolute:
+        x: 1854
+        y: 260
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        desc: Human handoff placeholder. Replace assignee group with CRM or ticketing integration after import.
+        form_schema:
+        - label: Customer question
+          required: true
+          variable: query
+          value: '{{#start.query#}}'
+        - label: Escalation reason
+          required: true
+          variable: escalation_reason
+          value: '{{#grounded_answer_llm.escalation_reason#}}'
+        reviewers:
+        - support_tier_2
+        selected: false
+        title: Human Handoff
+        type: human-input
+      height: 150
+      id: human_handoff
+      position:
+        x: 2158
+        y: 110
+      positionAbsolute:
+        x: 2158
+        y: 110
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        answer: '{{#grounded_answer_llm.answer#}}'
+        desc: Final answer includes citations and feedback line.
+        selected: false
+        title: Final Answer With Sources And Feedback
+        type: answer
+        variables: []
+      height: 130
+      id: final_answer
+      position:
+        x: 2158
+        y: 330
+      positionAbsolute:
+        x: 2158
+        y: 330
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        answer: "I do not have enough reliable evidence to answer this safely. I have routed this to a human support queue. Please keep this reference with your message: {{#human_handoff.result#}}. Feedback: you can rate this handoff in the chat or add missing details for the support team."
+        desc: Low-confidence handoff confirmation.
+        selected: false
+        title: Handoff Answer
+        type: answer
+        variables: []
+      height: 130
+      id: handoff_answer
+      position:
+        x: 2462
+        y: 110
+      positionAbsolute:
+        x: 2462
+        y: 110
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    viewport:
+      x: 0
+      y: 0
+      zoom: 0.55
+x_static_validation:
+  importability: dsl_skeleton_close_to_dify_0_3_1
+  start_inputs:
+  - query
+  - brand
+  - market
+  - language
+  - audience
+  optional_context_inputs:
+  - model
+  - model_year
+  - order_no
+  - serial_no
+  - customer_id
+  required_nodes:
+  - start
+  - question-classifier
+  - parameter-extractor
+  - knowledge-retrieval
+  - http-request
+  - llm
+  - if-else
+  - human-input
+  - answer
+  metadata_filters:
+  - brand
+  - market
+  - language
+  - audience
+  - status
+  - legal_approved
+  - model
+  - model_year
+  tool_placeholders:
+  - /support/context
+  human_handoff:
+    node_id: human_handoff
+    triggers:
+    - battery_safety
+    - confidence_below_0_65
+    - insufficient_evidence
+  safety_branches:
+  - battery_safety
+  - smoke
+  - fire
+  - odor
+  - swelling
+  - brake_failure
+  - frame_crack
+  citations_required: true
+  feedback_collection:
+    channel: dify_message_feedback_or_feedback_api
+    prompt_required: true

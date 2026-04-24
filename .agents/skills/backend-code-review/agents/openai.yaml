@@ -1,0 +1,4 @@
+interface:
+  display_name: "Backend Code Review"
+  short_description: "Review Dify backend Python changes"
+  default_prompt: "Use $backend-code-review to review Dify backend API code for quality, security, and maintainability."

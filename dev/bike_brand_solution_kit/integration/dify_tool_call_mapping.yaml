@@ -1,0 +1,532 @@
+version: 1.0.0
+contract: ./bike_brand_integration.openapi.yaml
+purpose: >
+  Dify tool mapping for bicycle and e-bike brand workflows. This file is
+  intentionally structured so it can be linted, converted into Dify HTTP Request
+  node configuration, or used as implementation acceptance criteria.
+
+global_rules:
+  static_validation:
+    require_openapi_operation_id: true
+    require_tenant_header: X-Tenant-Id
+    require_market_header: X-Market
+    require_actor_header: X-Actor-Type
+    require_request_id_header: X-Request-Id
+    require_authentication: true
+    require_output_meta_kb_cache_allowed_false: true
+  tenant_market_isolation:
+    source: brand_bff_or_gateway
+    rule: >
+      Dify must pass tenant, market, actor type, channel, and request ID from the
+      trusted BFF or integration gateway. The integration service must reject
+      requests where headers conflict with token claims.
+  pii_minimization:
+    rule: >
+      Dify receives masked or redacted data by default. Raw email, phone, proof
+      of purchase, photos, and transcript data may only be sent to write APIs
+      that need them, and must never be stored in Dify knowledge bases.
+  dynamic_data_policy:
+    never_cache_in_kb:
+      - price
+      - inventory
+      - availability
+      - order_status
+      - tracking
+      - serial_registration
+      - recall_hit
+      - crm_customer_state
+      - warranty_decision
+      - appointment_slot
+      - ticket_status
+    answer_usage: >
+      Dynamic API output may be summarized in the current answer and logged
+      according to retention policy, but it must not be ingested as static KB
+      documents or used to generate future answers without a fresh tool call.
+  low_confidence_thresholds:
+    normal_answer_min_confidence: 0.75
+    warranty_or_compatibility_min_confidence: 0.8
+    safety_min_confidence: 0.95
+  mandatory_human_escalation:
+    - battery_smoke_fire_burning_smell_swelling_or_water_ingress
+    - brake_failure_or_frame_crack
+    - recall_or_stop_ride_signal
+    - legal_claim_complaint_injury_or_accident
+    - warranty_result_needs_review_or_missing_evidence
+    - compatibility_result_unknown_or_safety_related
+    - user_requests_human_agent
+    - upstream_unavailable_for_order_warranty_safety_or_crm_write
+
+tools:
+  - tool_name: product_catalog_search
+    openapi_operation_id: listProducts
+    method: GET
+    path: /products
+    intents:
+      - pre_sales_inquiry
+      - model_recommendation
+      - product_comparison
+      - accessory_discovery
+    input_sources:
+      q: user_utterance_or_parameter_extractor
+      category: question_classifier
+      bike_type: parameter_extractor
+      model_year: parameter_extractor
+      audience: actor_type_to_audience_mapping
+      include_live_offer: workflow_boolean_explicit_only
+      headers: trusted_bff_context
+    output_to_answer:
+      use_fields:
+        - data.items[].name
+        - data.items[].sku
+        - data.items[].short_description
+        - data.items[].bike_type
+        - data.items[].model_year
+        - data.items[].live_offer.availability
+      response_pattern: summarize_options_with_next_step
+      cite_source: meta.audit.source_system
+      forbidden_use:
+        - do_not_state_price_or_stock_without_include_live_offer_true
+        - do_not_cache_live_offer_in_kb
+    must_escalate_when:
+      - no_results_after_retrieval_and_user_has_purchase_intent
+      - user_asks_for_binding_quote_or_discount_exception
+
+  - tool_name: product_catalog_detail
+    openapi_operation_id: getProductBySku
+    method: GET
+    path: /products/{sku}
+    intents:
+      - product_detail
+      - product_specs
+      - product_comparison
+      - manual_or_document_lookup_context
+    input_sources:
+      sku: parameter_extractor_or_previous_tool_result
+      include_live_offer: workflow_boolean_explicit_only
+      headers: trusted_bff_context
+    output_to_answer:
+      use_fields:
+        - data.name
+        - data.sku
+        - data.specs
+        - data.short_description
+        - data.related_document_refs
+      response_pattern: answer_with_specs_and_relevant_caveats
+      forbidden_use:
+        - do_not_infer_compatibility_from_related_accessories_alone
+        - do_not_cache_live_offer_in_kb
+    must_escalate_when:
+      - data.safety_related=true
+      - product_not_visible_for_actor_or_market
+
+  - tool_name: compatibility_check
+    openapi_operation_id: checkCompatibility
+    method: GET
+    path: /compatibility/check
+    intents:
+      - accessory_compatibility
+      - replacement_part_fitment
+      - battery_motor_display_controller_compatibility
+      - dealer_internal_parts_support
+    input_sources:
+      primary_sku: parameter_extractor_or_product_context
+      accessory_sku: parameter_extractor_or_product_context
+      model_year: parameter_extractor
+      serial_no: user_provided_only_with_redaction
+      use_case: user_utterance_summary
+      headers: trusted_bff_context
+    output_to_answer:
+      use_fields:
+        - data.result
+        - data.explanation
+        - data.required_conditions
+        - data.references
+      response_pattern: state_rule_result_then_conditions_then_next_step
+      forbidden_use:
+        - do_not_override_rule_result_with_llm_reasoning
+        - do_not_store_serial_or_result_in_kb
+    must_escalate_when:
+      - data.result=unknown
+      - data.confidence<0.8
+      - data.safety_related=true
+      - data.escalation.required=true
+
+  - tool_name: order_status_lookup
+    openapi_operation_id: getOrderByNumber
+    method: GET
+    path: /orders/{order_no}
+    intents:
+      - order_status
+      - shipping_tracking
+      - return_or_refund_context
+    input_sources:
+      order_no: parameter_extractor_or_authenticated_context
+      verification_token: trusted_bff_context_optional
+      headers: trusted_bff_context
+    output_to_answer:
+      use_fields:
+        - data.order_no
+        - data.status
+        - data.tracking[].carrier
+        - data.tracking[].status
+        - data.tracking[].eta_date
+      response_pattern: provide_current_status_and_customer_safe_next_step
+      forbidden_use:
+        - do_not_show_unmasked_tracking_or_customer_pii
+        - do_not_cache_order_status_in_kb
+    must_escalate_when:
+      - data.status=exception
+      - http_status in [401,403]
+      - repeated_404_after_user_confirms_order_number
+      - upstream_unavailable
+
+  - tool_name: dealer_locator
+    openapi_operation_id: findNearbyDealers
+    method: GET
+    path: /dealers/nearby
+    intents:
+      - dealer_locator
+      - test_ride_routing
+      - purchase_location
+      - warranty_dealer_required
+    input_sources:
+      latitude: user_location_with_consent_or_bff_context
+      longitude: user_location_with_consent_or_bff_context
+      postal_code: user_utterance_or_profile
+      radius_km: workflow_default_or_user_preference
+      capabilities: question_classifier
+      headers: trusted_bff_context
+    output_to_answer:
+      use_fields:
+        - data.items[].name
+        - data.items[].distance_km
+        - data.items[].capabilities
+        - data.items[].address_summary
+        - data.items[].booking_url
+      response_pattern: list_nearest_options_and_offer_booking
+      forbidden_use:
+        - do_not_persist_precise_location_without_external_consent
+    must_escalate_when:
+      - no_authorized_dealer_with_required_capability
+      - user_has_safety_or_recall_issue
+
+  - tool_name: serial_status_lookup
+    openapi_operation_id: getSerialStatus
+    method: GET
+    path: /serials/{serial_no}
+    intents:
+      - serial_verification
+      - registration_status
+      - recall_check
+      - warranty_context
+      - theft_or_ownership_support
+    input_sources:
+      serial_no: user_provided_or_authenticated_vehicle_context
+      headers: trusted_bff_context
+    output_to_answer:
+      use_fields:
+        - data.serial_no_masked
+        - data.status
+        - data.model_name
+        - data.model_year
+        - data.registration_status
+        - data.recall_status
+        - data.safety_flags
+      response_pattern: state_status_without_owner_pii_and_route_next_step
+      forbidden_use:
+        - do_not_disclose_owner_identity
+        - do_not_cache_serial_status_in_kb
+    must_escalate_when:
+      - data.recall_status=affected
+      - data.status=stolen_reported
+      - data.safety_flags not_empty
+      - data.confidence<0.8
+
+  - tool_name: warranty_rules_check
+    openapi_operation_id: checkWarrantyRules
+    method: GET
+    path: /warranty/rules/check
+    intents:
+      - warranty_policy_check
+      - warranty_eligibility_precheck
+      - dealer_warranty_triage
+    input_sources:
+      serial_no: user_provided_or_serial_tool_context
+      sku: product_context
+      part_category: parameter_extractor
+      purchase_date: parameter_extractor_or_order_context
+      issue_category: question_classifier
+      has_proof_of_purchase: user_confirmation_or_attachment_presence
+      headers: trusted_bff_context
+    output_to_answer:
+      use_fields:
+        - data.result
+        - data.explanation
+        - data.missing_evidence
+        - data.references
+      response_pattern: emphasize_precheck_not_final_decision
+      forbidden_use:
+        - do_not_claim_final_warranty_approval_or_denial
+        - do_not_cache_warranty_result_in_kb
+    must_escalate_when:
+      - data.result=needs_review
+      - data.confidence<0.8
+      - data.missing_evidence not_empty
+      - data.escalation.required=true
+
+  - tool_name: service_center_locator
+    openapi_operation_id: findNearbyServiceCenters
+    method: GET
+    path: /service-centers/nearby
+    intents:
+      - service_center_locator
+      - repair_routing
+      - warranty_service_routing
+      - battery_or_motor_service
+    input_sources:
+      latitude: user_location_with_consent_or_bff_context
+      longitude: user_location_with_consent_or_bff_context
+      postal_code: user_utterance_or_profile
+      radius_km: workflow_default_or_user_preference
+      service_types: question_classifier
+      headers: trusted_bff_context
+    output_to_answer:
+      use_fields:
+        - data.items[].name
+        - data.items[].distance_km
+        - data.items[].service_types
+        - data.items[].address_summary
+        - data.items[].booking_url
+        - data.items[].emergency_supported
+      response_pattern: list_authorized_service_options_and_scheduling_next_step
+      forbidden_use:
+        - do_not_persist_precise_location_without_external_consent
+    must_escalate_when:
+      - user_has_battery_fire_smoke_or_brake_failure
+      - no_service_center_for_required_service_type
+
+  - tool_name: crm_customer_lookup
+    openapi_operation_id: getCrmCustomer
+    method: GET
+    path: /crm/customers/{id}
+    intents:
+      - authenticated_customer_context
+      - support_personalization
+      - dealer_or_agent_customer_lookup
+    input_sources:
+      id: authenticated_context_or_support_console_selection
+      headers: trusted_bff_context
+    output_to_answer:
+      use_fields:
+        - data.contact_masked
+        - data.preferred_language
+        - data.consent_status
+        - data.ownership_skus
+        - data.open_ticket_count
+      response_pattern: use_for_routing_and_context_not_freeform_disclosure
+      forbidden_use:
+        - do_not_repeat_masked_contact_unless_needed_for_confirmation
+        - do_not_cache_crm_profile_in_kb
+    must_escalate_when:
+      - data.consent_status in [missing,revoked]
+      - actor_type_not_support_agent_or_internal_for_manual_lookup
+
+  - tool_name: crm_lead_create
+    openapi_operation_id: createCrmLead
+    method: POST
+    path: /crm/leads
+    intents:
+      - create_sales_lead
+      - request_dealer_contact
+      - test_ride_interest
+      - model_recommendation_followup
+    input_sources:
+      contact: explicit_user_submission_or_authenticated_context
+      consent: explicit_privacy_and_contact_consent
+      interest: classifier_and_parameter_extractor
+      dify_context: redacted_conversation_context
+      headers: trusted_bff_context
+    output_to_answer:
+      use_fields:
+        - data.lead_id
+        - data.status
+        - data.assigned_dealer_id
+        - data.escalation
+      response_pattern: confirm_request_and_set_followup_expectation
+      forbidden_use:
+        - do_not_echo_raw_email_or_phone
+        - do_not_create_without_contact_allowed_true
+        - do_not_cache_lead_in_kb
+    must_escalate_when:
+      - data.status=pending_review
+      - duplicate_conflict_with_different_contact
+      - consent_missing_or_revoked
+
+  - tool_name: support_ticket_create
+    openapi_operation_id: createTicket
+    method: POST
+    path: /tickets
+    intents:
+      - create_support_ticket
+      - complaint
+      - safety_issue
+      - warranty_ticket
+      - unresolved_order_issue
+    input_sources:
+      customer: explicit_user_submission_or_authenticated_context
+      issue_category: question_classifier
+      severity: safety_classifier_and_rules
+      subject: concise_llm_summary
+      description: redacted_user_summary
+      attachments: uploaded_file_references_after_redaction
+      dify_context: redacted_conversation_context
+      headers: trusted_bff_context
+    output_to_answer:
+      use_fields:
+        - data.ticket_id
+        - data.status
+        - data.priority
+        - data.escalation
+      response_pattern: confirm_ticket_and_next_steps
+      forbidden_use:
+        - do_not_include_unredacted_transcript
+        - do_not_cache_ticket_content_in_kb
+    must_escalate_when:
+      - severity in [high,critical]
+      - safety_related=true
+      - legal_or_complaint=true
+      - data.escalation.required=true
+
+  - tool_name: warranty_precheck_create
+    openapi_operation_id: createWarrantyPrecheck
+    method: POST
+    path: /warranty/precheck
+    intents:
+      - create_warranty_precheck
+      - warranty_claim_start
+      - dealer_warranty_submission
+    input_sources:
+      customer: explicit_user_submission_or_authenticated_context
+      serial_no: user_provided_or_serial_tool_context
+      sku: product_or_order_context
+      order_no: authenticated_order_context
+      purchase_date: order_context_or_user_input
+      issue_category: question_classifier
+      issue_description: redacted_user_summary
+      attachments: proof_and_photo_references_after_redaction
+      dify_context: redacted_conversation_context
+      headers: trusted_bff_context
+    output_to_answer:
+      use_fields:
+        - data.precheck_id
+        - data.precheck_status
+        - data.missing_evidence
+        - data.next_steps
+        - data.escalation
+      response_pattern: explain_precheck_next_steps_without_final_claim_decision
+      forbidden_use:
+        - do_not_claim_final_replacement_refund_or_approval
+        - do_not_cache_warranty_case_in_kb
+    must_escalate_when:
+      - data.precheck_status in [needs_review,missing_information]
+      - data.confidence<0.85
+      - safety_related=true
+      - data.escalation.required=true
+
+  - tool_name: test_ride_appointment_create
+    openapi_operation_id: createTestRideAppointment
+    method: POST
+    path: /appointments/test-ride
+    intents:
+      - book_test_ride
+      - schedule_dealer_visit
+      - sales_conversion
+    input_sources:
+      contact: explicit_user_submission_or_authenticated_context
+      consent: explicit_privacy_and_contact_consent
+      sku: product_context_or_user_input
+      dealer_id: dealer_locator_result_or_user_selection
+      preferred_window: user_selected_slot
+      notes: redacted_user_summary
+      headers: trusted_bff_context
+    output_to_answer:
+      use_fields:
+        - data.appointment_id
+        - data.status
+        - data.location_id
+        - data.confirmed_window
+      response_pattern: confirm_request_or_pending_dealer_confirmation
+      forbidden_use:
+        - do_not_create_without_privacy_notice_accepted
+        - do_not_cache_appointment_in_kb
+    must_escalate_when:
+      - data.status=rejected
+      - repeated_slot_conflict
+      - user_requests_accessibility_or_exception_handling
+
+  - tool_name: service_appointment_create
+    openapi_operation_id: createServiceAppointment
+    method: POST
+    path: /appointments/service
+    intents:
+      - book_service
+      - repair_appointment
+      - warranty_service_appointment
+      - safety_service_handoff
+    input_sources:
+      contact: explicit_user_submission_or_authenticated_context
+      service_center_id: service_center_locator_result_or_user_selection
+      serial_no: user_provided_or_serial_tool_context
+      sku: product_or_order_context
+      issue_category: question_classifier
+      issue_summary: redacted_user_summary
+      severity: safety_classifier_and_rules
+      preferred_window: user_selected_slot
+      headers: trusted_bff_context
+    output_to_answer:
+      use_fields:
+        - data.appointment_id
+        - data.status
+        - data.location_id
+        - data.confirmed_window
+        - data.escalation
+      response_pattern: confirm_service_request_and_safety_next_steps
+      forbidden_use:
+        - do_not_present_booking_as_substitute_for_emergency_guidance
+        - do_not_cache_service_appointment_in_kb
+    must_escalate_when:
+      - safety_related=true
+      - severity in [high,critical]
+      - data.escalation.required=true
+
+  - tool_name: feedback_escalation_create
+    openapi_operation_id: createFeedbackEscalation
+    method: POST
+    path: /feedback/escalation
+    intents:
+      - low_confidence_handoff
+      - human_agent_request
+      - safety_escalation
+      - legal_or_complaint_escalation
+      - policy_exception_review
+    input_sources:
+      reason: classifier_rule_or_tool_escalation_hint
+      severity: safety_classifier_and_rules
+      user_visible_summary: concise_safe_summary
+      redacted_internal_context: redacted_conversation_context
+      related_resource: prior_tool_result
+      customer_contact: explicit_user_submission_or_authenticated_context
+      dify_context: redacted_conversation_context
+      headers: trusted_bff_context
+    output_to_answer:
+      use_fields:
+        - data.escalation_id
+        - data.status
+        - data.target_queue
+        - data.sla
+      response_pattern: tell_user_handoff_started_and_avoid_unverified_answer
+      forbidden_use:
+        - do_not_include_unredacted_transcript
+        - do_not_cache_escalation_in_kb
+    must_escalate_when:
+      - always_when_called

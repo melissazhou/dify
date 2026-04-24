@@ -1,0 +1,389 @@
+{
+  "schema_version": "1.0",
+  "purpose": "Local full-stack connectivity contract for the bike brand assistant demo.",
+  "environment_variables": {
+    "FRONTEND_ORIGIN": {
+      "default": "http://localhost:3000",
+      "description": "Brand storefront or local page hosting the BikeAssistantWidget."
+    },
+    "BIKE_ASSISTANT_BFF_ORIGIN": {
+      "default": "http://localhost:3000",
+      "description": "BFF origin that exposes the browser-facing assistant endpoints."
+    },
+    "DIFY_API_ORIGIN": {
+      "default": "http://localhost:5001",
+      "description": "Local Dify API origin used only by the BFF or server-side integration code."
+    },
+    "BIKE_BRAND_BUSINESS_API_ORIGIN": {
+      "default": "http://localhost:8090",
+      "description": "Mock or real business integration service implementing integration/bike_brand_integration.openapi.yaml."
+    }
+  },
+  "static_assets": [
+    {
+      "id": "frontend_example_page",
+      "path": "../frontend/examples/product-page.tsx",
+      "expected": {
+        "file_exists": true,
+        "imports": ["BikeAssistantWidget", "BikeAssistantRequestContext"],
+        "must_not_contain": ["DIFY_API_KEY", "Authorization: Bearer"]
+      }
+    },
+    {
+      "id": "bff_openapi_contract",
+      "path": "../frontend/contracts/bike-assistant-bff.openapi.yaml",
+      "expected": {
+        "file_exists": true,
+        "paths": ["POST /api/bike-assistant/chat", "POST /api/bike-assistant/feedback"]
+      }
+    },
+    {
+      "id": "business_openapi_contract",
+      "path": "../integration/bike_brand_integration.openapi.yaml",
+      "expected": {
+        "file_exists": true,
+        "paths": [
+          "GET /products",
+          "GET /products/{sku}",
+          "GET /orders/{order_no}",
+          "GET /dealers/nearby",
+          "POST /warranty/rules/check",
+          "GET /service-centers/nearby"
+        ]
+      }
+    }
+  ],
+  "runtime_checks": [
+    {
+      "id": "frontend_demo_page",
+      "owner": "frontend",
+      "method": "GET",
+      "url": "${FRONTEND_ORIGIN}/bike-brand",
+      "expected_status_any": [200],
+      "key_fields_or_markers": [
+        "bike-brand",
+        "solution",
+        "assistant"
+      ],
+      "acceptance_note": "The local startup script checks this Dify demo page. A production brand storefront can additionally mount frontend/examples/product-page.tsx on its own product route."
+    },
+    {
+      "id": "console_ping",
+      "owner": "dify",
+      "method": "GET",
+      "url": "${DIFY_API_ORIGIN}/console/api/ping",
+      "expected_status_any": [200],
+      "key_fields_or_markers": ["pong", "ok", "success"],
+      "acceptance_note": "This is the first API check executed by local/healthcheck-local-demo.ps1."
+    },
+    {
+      "id": "console_solution_summary",
+      "owner": "dify",
+      "method": "GET",
+      "url": "${DIFY_API_ORIGIN}/console/api/bike-brand/solution-kit/summary",
+      "expected_status_any": [200],
+      "required_json_fields": [
+        "sections",
+        "asset_counts",
+        "openapi_operation_count",
+        "workflow_templates",
+        "acceptance_points",
+        "warnings"
+      ]
+    },
+    {
+      "id": "console_solution_assets",
+      "owner": "dify",
+      "method": "GET",
+      "url": "${DIFY_API_ORIGIN}/console/api/bike-brand/solution-kit/assets/knowledge",
+      "expected_status_any": [200],
+      "required_json_fields": [
+        "section",
+        "root",
+        "files",
+        "warnings"
+      ],
+      "required_values": {
+        "section": "knowledge"
+      }
+    },
+    {
+      "id": "console_local_assistant_chat",
+      "owner": "dify",
+      "method": "POST",
+      "url": "${DIFY_API_ORIGIN}/console/api/bike-brand/assistant/chat",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "message": "What should I do if my battery is swelling?",
+        "context": {
+          "sku": "URB-E-500-2025-M",
+          "market": "north-america",
+          "language": "en-US",
+          "user_type": "consumer",
+          "session_id": "sess-health-console-001"
+        }
+      },
+      "expected_status_any": [200],
+      "required_json_fields": [
+        "answer",
+        "intent",
+        "confidence",
+        "citations",
+        "next_actions",
+        "escalation.required",
+        "escalation.reason",
+        "source",
+        "message_id",
+        "session_id"
+      ],
+      "required_values": {
+        "intent": "battery_safety",
+        "source": "local_demo"
+      }
+    },
+    {
+      "id": "console_local_assistant_feedback",
+      "owner": "dify",
+      "method": "POST",
+      "url": "${DIFY_API_ORIGIN}/console/api/bike-brand/assistant/feedback",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "message_id": "msg-health-console-001",
+        "rating": "up",
+        "comment": "Local health check feedback."
+      },
+      "expected_status_any": [200],
+      "required_json_fields": [
+        "accepted",
+        "audit_id",
+        "source"
+      ],
+      "required_values": {
+        "accepted": true,
+        "source": "local_demo"
+      }
+    },
+    {
+      "id": "bff_chat_smoke",
+      "owner": "bff",
+      "method": "POST",
+      "url": "${BIKE_ASSISTANT_BFF_ORIGIN}/api/bike-assistant/chat",
+      "headers": {
+        "Content-Type": "application/json",
+        "Accept-Language": "en-US",
+        "X-Bike-Brand-Tenant": "example-bike",
+        "X-Bike-Brand-Session": "sess-health-001",
+        "X-Client-Trace-Id": "trace-health-001"
+      },
+      "body_source": "tests/demo_chat_cases.json#cases[0].request",
+      "expected_status_any": [200],
+      "required_json_fields": [
+        "answer",
+        "conversation_id",
+        "message_id",
+        "intent",
+        "confidence",
+        "citations",
+        "next_actions",
+        "escalation.status",
+        "feedback.enabled",
+        "feedback.endpoint",
+        "feedback.message_id",
+        "server_trace_id"
+      ],
+      "required_values": {
+        "feedback.endpoint": "/api/bike-assistant/feedback"
+      }
+    },
+    {
+      "id": "bff_feedback_smoke",
+      "owner": "bff",
+      "method": "POST",
+      "url": "${BIKE_ASSISTANT_BFF_ORIGIN}/api/bike-assistant/feedback",
+      "headers": {
+        "Content-Type": "application/json",
+        "X-Client-Trace-Id": "trace-health-feedback-001"
+      },
+      "body": {
+        "message_id": "msg-health-001",
+        "conversation_id": "conv-health-001",
+        "rating": "up",
+        "client_trace_id": "trace-health-feedback-001"
+      },
+      "expected_status_any": [204],
+      "required_json_fields": []
+    },
+    {
+      "id": "dify_api_health",
+      "owner": "dify",
+      "method": "GET",
+      "url": "${DIFY_API_ORIGIN}/health",
+      "expected_status_any": [200],
+      "key_fields_or_markers": ["status"],
+      "acceptance_note": "The BFF, not the browser, owns this check. Adapt the path if the local Dify deployment exposes a different health endpoint."
+    },
+    {
+      "id": "business_api_health",
+      "owner": "business_integration",
+      "method": "GET",
+      "url": "${BIKE_BRAND_BUSINESS_API_ORIGIN}/health",
+      "expected_status_any": [200],
+      "required_json_fields": ["status", "version"],
+      "required_values": {
+        "status": "ok"
+      }
+    },
+    {
+      "id": "business_product_live_offer",
+      "owner": "business_integration",
+      "method": "GET",
+      "url": "${BIKE_BRAND_BUSINESS_API_ORIGIN}/products/URB-E-500-2025-M?include_live_offer=true",
+      "headers": {
+        "Authorization": "Bearer ${SERVER_SIDE_BUSINESS_API_TOKEN}",
+        "X-Gateway-Api-Key": "${SERVER_SIDE_GATEWAY_API_KEY}",
+        "X-Tenant-Id": "example-bike",
+        "X-Market": "north-america",
+        "X-Actor-Type": "consumer",
+        "X-Request-Id": "health-product-001"
+      },
+      "expected_status_any": [200],
+      "required_json_fields": [
+        "data.sku",
+        "data.name",
+        "data.model_year",
+        "data.live_offer.price.amount",
+        "data.live_offer.price.currency",
+        "data.live_offer.availability",
+        "meta.kb_cache_allowed"
+      ],
+      "required_values": {
+        "data.sku": "URB-E-500-2025-M",
+        "meta.kb_cache_allowed": false
+      }
+    },
+    {
+      "id": "business_order_lookup",
+      "owner": "business_integration",
+      "method": "GET",
+      "url": "${BIKE_BRAND_BUSINESS_API_ORIGIN}/orders/EB-10004567",
+      "headers": {
+        "Authorization": "Bearer ${SERVER_SIDE_BUSINESS_API_TOKEN}",
+        "X-Gateway-Api-Key": "${SERVER_SIDE_GATEWAY_API_KEY}",
+        "X-Tenant-Id": "example-bike",
+        "X-Market": "north-america",
+        "X-Actor-Type": "consumer",
+        "X-Request-Id": "health-order-001"
+      },
+      "expected_status_any": [200, 401, 403, 404],
+      "required_json_fields_when_200": [
+        "data.order_no",
+        "data.status",
+        "data.tracking",
+        "meta.kb_cache_allowed"
+      ],
+      "required_json_fields_when_error": [
+        "error.code",
+        "error.message",
+        "error.retryable",
+        "meta.request_id",
+        "meta.kb_cache_allowed"
+      ]
+    },
+    {
+      "id": "business_warranty_rules",
+      "owner": "business_integration",
+      "method": "POST",
+      "url": "${BIKE_BRAND_BUSINESS_API_ORIGIN}/warranty/rules/check",
+      "headers": {
+        "Authorization": "Bearer ${SERVER_SIDE_BUSINESS_API_TOKEN}",
+        "X-Gateway-Api-Key": "${SERVER_SIDE_GATEWAY_API_KEY}",
+        "X-Tenant-Id": "example-bike",
+        "X-Market": "north-america",
+        "X-Actor-Type": "consumer",
+        "X-Request-Id": "health-warranty-001"
+      },
+      "body": {
+        "model": "Urban E 500",
+        "model_year": 2025,
+        "serial_no": "EB25U50012345",
+        "component": "display",
+        "region": "US",
+        "purchase_proof_url": "attachment://receipt-health-001",
+        "photo_urls": ["attachment://photo-health-001"],
+        "usage_description": "Display stopped working during normal commuting."
+      },
+      "expected_status_any": [200, 422],
+      "required_json_fields_when_200": [
+        "data.result",
+        "data.confidence",
+        "data.policy_version",
+        "data.escalation.required",
+        "meta.kb_cache_allowed"
+      ],
+      "required_json_fields_when_error": [
+        "error.code",
+        "error.details",
+        "error.escalation_required",
+        "meta.request_id",
+        "meta.kb_cache_allowed"
+      ]
+    },
+    {
+      "id": "business_dealer_locator",
+      "owner": "business_integration",
+      "method": "GET",
+      "url": "${BIKE_BRAND_BUSINESS_API_ORIGIN}/dealers/nearby?postal_code=94107&radius_km=25&capabilities=test_ride",
+      "headers": {
+        "Authorization": "Bearer ${SERVER_SIDE_BUSINESS_API_TOKEN}",
+        "X-Gateway-Api-Key": "${SERVER_SIDE_GATEWAY_API_KEY}",
+        "X-Tenant-Id": "example-bike",
+        "X-Market": "north-america",
+        "X-Actor-Type": "consumer",
+        "X-Request-Id": "health-dealer-001"
+      },
+      "expected_status_any": [200],
+      "required_json_fields": [
+        "data.items",
+        "data.items[0].name",
+        "data.items[0].distance_km",
+        "data.items[0].capabilities",
+        "data.items[0].booking_url",
+        "meta.kb_cache_allowed"
+      ]
+    },
+    {
+      "id": "business_service_center_locator",
+      "owner": "business_integration",
+      "method": "GET",
+      "url": "${BIKE_BRAND_BUSINESS_API_ORIGIN}/service-centers/nearby?postal_code=10001&radius_km=25&capabilities=bosch_drive",
+      "headers": {
+        "Authorization": "Bearer ${SERVER_SIDE_BUSINESS_API_TOKEN}",
+        "X-Gateway-Api-Key": "${SERVER_SIDE_GATEWAY_API_KEY}",
+        "X-Tenant-Id": "example-bike",
+        "X-Market": "north-america",
+        "X-Actor-Type": "consumer",
+        "X-Request-Id": "health-service-001"
+      },
+      "expected_status_any": [200],
+      "required_json_fields": [
+        "data.items",
+        "data.items[0].name",
+        "data.items[0].distance_km",
+        "data.items[0].capabilities",
+        "data.items[0].booking_url",
+        "meta.kb_cache_allowed"
+      ]
+    }
+  ],
+  "acceptance_rules": [
+    "Browser traffic may only call BIKE_ASSISTANT_BFF_ORIGIN endpoints.",
+    "DIFY_API_ORIGIN and BIKE_BRAND_BUSINESS_API_ORIGIN calls must be server-side only.",
+    "Dynamic business responses must include meta.kb_cache_allowed=false.",
+    "Safety and warranty-blocking upstream failures must produce a typed error or non-not_needed escalation.",
+    "The BFF must not return server-side Dify or business API credentials to the browser."
+  ]
+}

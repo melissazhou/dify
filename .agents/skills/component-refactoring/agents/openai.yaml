@@ -1,0 +1,4 @@
+interface:
+  display_name: "Component Refactoring"
+  short_description: "Refactor complex Dify React components"
+  default_prompt: "Use $component-refactoring to refactor a high-complexity Dify React component."
